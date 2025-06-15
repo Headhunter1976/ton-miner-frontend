@@ -66,7 +66,7 @@ function AnimatedNumber({ value, suffix = "", prefix = "" }) {
 }
 
 function FarmCard({ farmKey, farm, isSelected, isUnlocked, onSelect }) {
-    return (
+     return (
         <div 
             onClick={() => isUnlocked && onSelect(farmKey)}
             className={`p-4 rounded-xl border-2 transition-all duration-300 cursor-pointer ${
@@ -184,7 +184,7 @@ function App() {
         console.log("Fetching all data...");
         await Promise.all([fetchFarmData(), fetchInventory()]);
         setIsLoading(false);
-    }, [wallet]); // Zależności zostaną dodane w głównym useEffect
+    }, [wallet]);
 
     const handleTransaction = async (address, amount, payload) => {
         if (!wallet) return;
@@ -223,7 +223,7 @@ function App() {
     }, [wallet, client]);
 
     const handleClaim = () => {
-        const claimOpCode = 1906195048;
+        const claimOpCode = 1906195048; // Pamiętaj, aby podmienić na prawdziwy
         const body = beginCell().storeUint(claimOpCode, 32).storeUint(BigInt(Date.now()), 64).endCell();
         handleTransaction(STAKING_FARM_ADDRESS, toNano('0.05').toString(), body.toBoc().toString("base64"));
     };
@@ -277,7 +277,7 @@ function App() {
             }))
             .endCell();
         
-        const mintOpCode = 3871065451;
+        const mintOpCode = 3871065451; // Pamiętaj, aby podmienić na prawdziwy
         
         const body = beginCell()
             .storeUint(mintOpCode, 32)
@@ -330,10 +330,11 @@ function App() {
                     <div className="mt-4"><TonConnectButton /></div>
                 </header>
                 
-                <nav className="flex justify-center border-b border-gray-700 mb-6">
-                    <button onClick={() => setView('farm')} className={`py-2 px-4 text-lg ${view === 'farm' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-gray-400'}`}>Farma</button>
-                    <button onClick={() => setView('inventory')} className={`py-2 px-4 text-lg ${view === 'inventory' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-gray-400'}`}>Ekwipunek</button>
-                    <button onClick={() => setView('shop')} className={`py-2 px-4 text-lg ${view === 'shop' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-gray-400'}`}>Sklep</button>
+                <nav className="flex justify-around border-b border-gray-700 mb-6 text-sm sm:text-base">
+                    <button onClick={() => setView('farm')} className={`py-2 px-3 ${view === 'farm' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-gray-400'}`}>Farma</button>
+                    <button onClick={() => setView('inventory')} className={`py-2 px-3 ${view === 'inventory' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-gray-400'}`}>Ekwipunek</button>
+                    <button onClick={() => setView('shop')} className={`py-2 px-3 ${view === 'shop' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-gray-400'}`}>Sklep</button>
+                    <button onClick={() => setView('achievements')} className={`py-2 px-3 ${view === 'achievements' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-gray-400'}`}>Osiągnięcia</button>
                 </nav>
 
                 <main>
@@ -388,14 +389,26 @@ function App() {
                                     <div key={key} className="border border-gray-600 p-4 rounded-lg">
                                         <h3 className="text-xl font-semibold">{eq.emoji} {eq.name}</h3>
                                         <p className="text-sm text-gray-400 mt-1">Moc: {eq.hashPower} H/s</p>
-                                        <p className="text-sm text-gray-400">Koszt: {eq.price === 0 ? 'Za darmo (tylko opłata sieciowa)' : `${eq.price} TON`}</p>
-                                        <button onClick={() => handleMint(key)} disabled={isProcessing} className="w-full mt-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg">
-                                            {isProcessing ? "Przetwarzanie..." : "Kup"}
+                                        <p className="text-sm text-gray-400">Koszt: {eq.price === 0.1 ? '0.1 TON (na start)' : `${eq.price} TON`}</p>
+                                        <button onClick={() => handleMint(key)} disabled={isProcessing || playerLevel < eq.level} className="w-full mt-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg">
+                                            {playerLevel < eq.level ? `🔒 Wymagany Poziom ${eq.level}` : (isProcessing ? "Przetwarzanie..." : "Kup")}
                                         </button>
                                     </div>
                                 ))}
                             </div>
                         ) : <div className="bg-gray-700 p-4 rounded-lg"><p className="text-lg text-gray-300">Połącz portfel, aby wejść do sklepu.</p></div>
+                    )}
+                    
+                    {view === 'achievements' && (
+                        <div className="bg-gray-700 p-4 rounded-lg text-left space-y-3">
+                            <h2 className="text-2xl font-bold mb-4">Osiągnięcia</h2>
+                            {Object.entries(ACHIEVEMENTS).map(([key, ach]) => (
+                                <div key={key} className={`p-3 rounded-lg ${playerData.achievements[key] ? 'bg-green-500/20' : 'bg-gray-600/20'}`}>
+                                    <p className="font-bold">{ach.emoji} {ach.name}</p>
+                                    <p className="text-xs text-gray-400">{ach.description}</p>
+                                </div>
+                            ))}
+                        </div>
                     )}
                 </main>
             </div>
