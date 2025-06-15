@@ -7,13 +7,61 @@ import { toNano, beginCell } from '@ton/core';
 const STAKING_FARM_ADDRESS = "EQC8MN1ykQZtHHHrWHGSOFyMB7tihHyL3paweoV8DFcJ7V3g";
 const NFT_COLLECTION_ADDRESS = "EQA1W7wNN-dwYQIcfUZXk8BEZsNGlGiWB3sskFrYLPZis36m";
 
+// Konfiguracja farm mining
+const MINING_FARMS = {
+    earth: {
+        name: "Earth Base",
+        emoji: "🌍",
+        description: "Podstawowa farma na Ziemi",
+        efficiency: 1.0,
+        energyCost: 0.5,
+        temperature: "20°C",
+        unlockLevel: 1,
+        background: "from-green-900/30 to-blue-900/30",
+        border: "border-green-500/30"
+    },
+    arctic: {
+        name: "Arctic Mine",
+        emoji: "🌨️",
+        description: "Zimna kopalnia z naturalnym chłodzeniem",
+        efficiency: 1.2,
+        energyCost: 0.3,
+        temperature: "-40°C",
+        unlockLevel: 2,
+        background: "from-cyan-900/30 to-blue-900/30",
+        border: "border-cyan-500/30"
+    },
+    desert: {
+        name: "Desert Solar",
+        emoji: "🏜️",
+        description: "Pustynna farma solarna",
+        efficiency: 1.5,
+        energyCost: 0.1,
+        temperature: "45°C",
+        unlockLevel: 3,
+        background: "from-yellow-900/30 to-orange-900/30",
+        border: "border-yellow-500/30"
+    },
+    space: {
+        name: "Space Station",
+        emoji: "🚀",
+        description: "Kosmiczna stacja mining",
+        efficiency: 2.0,
+        energyCost: 0.8,
+        temperature: "-270°C",
+        unlockLevel: 4,
+        background: "from-purple-900/30 to-indigo-900/30",
+        border: "border-purple-500/30"
+    }
+};
+
 // Konfiguracja typów sprzętu
 const EQUIPMENT_TYPES = {
     basic: {
         name: "Basic GPU",
         emoji: "🖥️",
         hashPower: 100,
-        price: 0, // Za darmo
+        price: 0,
         level: 1,
         description: "Podstawowy sprzęt do kopania",
         coinsPerSecond: 0.01
@@ -53,7 +101,8 @@ const ACHIEVEMENTS = {
     powerUser: { name: "Power User", emoji: "💪", description: "Osiągnij 1000 H/s", requirement: 1000 },
     tycoon: { name: "Mining Tycoon", emoji: "👑", description: "Osiągnij 10000 H/s", requirement: 10000 },
     collector: { name: "Collector", emoji: "🎒", description: "Posiadaj 5 NFT", requirement: 5 },
-    millionaire: { name: "Millionaire", emoji: "💎", description: "Zarobić 1000 TMT", requirement: 1000 }
+    millionaire: { name: "Millionaire", emoji: "💎", description: "Zarobić 1000 TMT", requirement: 1000 },
+    explorer: { name: "Space Explorer", emoji: "🚀", description: "Odblokuj farmę kosmiczną", requirement: 1 }
 };
 
 // Daily rewards configuration
@@ -79,7 +128,7 @@ const WHEEL_PRIZES = [
     { id: 8, name: "Jackpot!", emoji: "🏆", value: 500, type: "coins", color: "bg-gradient-to-r from-yellow-400 to-yellow-600" }
 ];
 
-// Mock leaderboard data (w prawdziwej aplikacji byłoby z backend)
+// Mock leaderboard data
 const MOCK_LEADERBOARD = [
     { name: "CryptoKing", hashPower: 50000, level: 4, avatar: "👑" },
     { name: "MinerPro", hashPower: 25000, level: 4, avatar: "⚡" },
@@ -88,13 +137,13 @@ const MOCK_LEADERBOARD = [
     { name: "TonFan", hashPower: 5000, level: 2, avatar: "💎" }
 ];
 
-// Komponenty pomocnicze
+// Helper Components
 function AnimatedNumber({ value, suffix = "", prefix = "" }) {
     const [displayValue, setDisplayValue] = useState(value);
     
     useEffect(() => {
         if (value !== displayValue) {
-            const duration = 1000; // 1 sekunda animacji
+            const duration = 1000;
             const steps = 30;
             const stepValue = (value - displayValue) / steps;
             const stepTime = duration / steps;
@@ -144,269 +193,63 @@ function CountdownTimer({ seconds, onComplete }) {
     );
 }
 
-function DailyRewardCard({ reward, day, isClaimed, isToday, onClaim }) {
+function FarmCard({ farmKey, farm, isSelected, isUnlocked, onSelect }) {
     return (
-        <div className={`p-4 rounded-xl border transition-all duration-300 ${
-            isClaimed 
-                ? 'bg-gray-600/30 border-gray-500/50 opacity-60' 
-                : isToday
-                    ? 'bg-gradient-to-br from-amber-500/30 to-yellow-500/30 border-amber-400/70 shadow-lg shadow-amber-500/30 animate-pulse'
-                    : 'bg-gradient-to-br from-blue-600/20 to-purple-600/20 border-blue-500/50'
-        }`}>
+        <div 
+            onClick={() => isUnlocked && onSelect(farmKey)}
+            className={`p-4 rounded-xl border-2 transition-all duration-300 cursor-pointer ${
+                !isUnlocked 
+                    ? 'opacity-50 cursor-not-allowed border-gray-500/30 bg-gray-600/20'
+                    : isSelected
+                        ? `${farm.border} bg-gradient-to-br ${farm.background} shadow-lg transform scale-105`
+                        : `${farm.border} bg-gradient-to-br ${farm.background} hover:scale-102 hover:shadow-md`
+            }`}
+        >
             <div className="text-center">
-                <div className="text-3xl mb-2">{reward.emoji}</div>
-                <p className="font-bold text-white text-sm">Dzień {day}</p>
-                <p className="text-xs text-gray-300 mb-3">{reward.name}</p>
+                <div className="text-4xl mb-2">{farm.emoji}</div>
+                <h3 className="font-bold text-white text-lg">{farm.name}</h3>
+                <p className="text-xs text-gray-300 mt-1">{farm.description}</p>
                 
-                {isClaimed ? (
-                    <div className="py-2 px-4 bg-gray-600 rounded-lg">
-                        <span className="text-gray-300 text-sm">✅ Odebrano</span>
+                <div className="mt-3 space-y-1 text-xs">
+                    <div className="flex justify-between">
+                        <span className="text-blue-300">🌡️ Temperatura:</span>
+                        <span className="text-white font-bold">{farm.temperature}</span>
                     </div>
-                ) : isToday ? (
-                    <button 
-                        onClick={() => onClaim(reward)}
-                        className="w-full py-2 px-4 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-white font-bold rounded-lg transition-all duration-300 hover:scale-105 active:scale-95"
-                    >
-                        🎁 Odbierz
-                    </button>
-                ) : (
-                    <div className="py-2 px-4 bg-gray-700 rounded-lg">
-                        <span className="text-gray-400 text-sm">🔒 Zablokowane</span>
+                    <div className="flex justify-between">
+                        <span className="text-green-300">⚡ Efektywność:</span>
+                        <span className="text-green-400 font-bold">{(farm.efficiency * 100)}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-yellow-300">🔋 Energia:</span>
+                        <span className="text-yellow-400 font-bold">{farm.energyCost} TON/dzień</span>
+                    </div>
+                </div>
+                
+                {!isUnlocked && (
+                    <div className="mt-3 py-1 px-3 bg-gray-600/50 rounded-lg">
+                        <span className="text-gray-300 text-xs">🔒 Poziom {farm.unlockLevel}</span>
                     </div>
                 )}
-            </div>
-        </div>
-    );
-}
-
-function LuckyWheel({ prizes, onSpin, isSpinning, canSpin }) {
-    const [rotation, setRotation] = useState(0);
-    
-    const handleSpin = () => {
-        if (!canSpin || isSpinning) return;
-        
-        const spins = 5 + Math.random() * 5; // 5-10 pełnych obrotów
-        const finalRotation = rotation + spins * 360 + Math.random() * 360;
-        
-        setRotation(finalRotation);
-        
-        setTimeout(() => {
-            const prizeIndex = Math.floor(Math.random() * prizes.length);
-            onSpin(prizes[prizeIndex]);
-        }, 3000);
-    };
-    
-    return (
-        <div className="text-center">
-            <div className="relative w-64 h-64 mx-auto mb-6">
-                {/* Wheel */}
-                <div 
-                    className={`w-full h-full rounded-full border-8 border-yellow-400 transition-transform duration-3000 ease-out ${isSpinning ? 'animate-spin' : ''}`}
-                    style={{ transform: `rotate(${rotation}deg)` }}
-                >
-                    <div className="relative w-full h-full rounded-full overflow-hidden">
-                        {prizes.map((prize, index) => {
-                            const angle = (360 / prizes.length) * index;
-                            return (
-                                <div
-                                    key={prize.id}
-                                    className={`absolute w-full h-full ${prize.color}`}
-                                    style={{
-                                        clipPath: `polygon(50% 50%, 50% 0%, ${50 + 50 * Math.cos((angle + 360/prizes.length) * Math.PI / 180)}% ${50 - 50 * Math.sin((angle + 360/prizes.length) * Math.PI / 180)}%)`
-                                    }}
-                                >
-                                    <div className="absolute top-4 left-1/2 transform -translate-x-1/2 text-white text-center">
-                                        <div className="text-xl">{prize.emoji}</div>
-                                        <div className="text-xs font-bold">{prize.name}</div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
                 
-                {/* Pointer */}
-                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-2">
-                    <div className="w-0 h-0 border-l-4 border-r-4 border-b-8 border-l-transparent border-r-transparent border-b-yellow-400"></div>
-                </div>
-            </div>
-            
-            <button
-                onClick={handleSpin}
-                disabled={!canSpin || isSpinning}
-                className={`py-4 px-8 rounded-xl font-bold text-lg transition-all duration-300 ${
-                    canSpin && !isSpinning
-                        ? 'bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-400 hover:to-orange-500 text-white shadow-lg shadow-yellow-500/30 hover:scale-105 active:scale-95'
-                        : 'bg-gray-500 text-gray-300 cursor-not-allowed'
-                }`}
-            >
-                {isSpinning ? "🎰 Kręci się..." : canSpin ? "🎰 Zakręć kołem!" : "⏰ Przyjdź jutro"}
-            </button>
-        </div>
-    );
-}
-
-function LeaderboardItem({ player, rank, isCurrentPlayer = false }) {
-    const getRankEmoji = (rank) => {
-        if (rank === 1) return "🥇";
-        if (rank === 2) return "🥈";
-        if (rank === 3) return "🥉";
-        return `#${rank}`;
-    };
-
-    return (
-        <div className={`flex items-center justify-between p-3 rounded-lg transition-all duration-300 ${
-            isCurrentPlayer 
-                ? 'bg-gradient-to-r from-amber-600/30 to-yellow-600/30 border border-amber-500/50 shadow-lg shadow-amber-500/20' 
-                : 'bg-gradient-to-r from-gray-600/20 to-gray-500/20 hover:from-gray-600/30 hover:to-gray-500/30'
-        }`}>
-            <div className="flex items-center gap-3">
-                <span className="text-xl font-bold">{getRankEmoji(rank)}</span>
-                <div className="flex items-center gap-2">
-                    <span className="text-2xl">{player.avatar}</span>
-                    <div>
-                        <p className={`font-semibold ${isCurrentPlayer ? 'text-amber-300' : 'text-white'}`}>
-                            {player.name} {isCurrentPlayer && "(Ty)"}
-                        </p>
-                        <p className="text-xs text-gray-400">Poziom {player.level}</p>
-                    </div>
-                </div>
-            </div>
-            <div className="text-right">
-                <p className="font-bold text-cyan-400">{player.hashPower.toLocaleString()} H/s</p>
-            </div>
-        </div>
-    );
-}
-
-function AchievementBadge({ achievement, isUnlocked, progress = 0 }) {
-    return (
-        <div className={`p-3 rounded-lg border transition-all duration-300 ${
-            isUnlocked 
-                ? 'bg-gradient-to-r from-green-600/20 to-emerald-600/20 border-green-500/50 shadow-lg shadow-green-500/20' 
-                : 'bg-gradient-to-r from-gray-600/10 to-gray-500/10 border-gray-500/30'
-        }`}>
-            <div className="text-center">
-                <div className={`text-3xl mb-1 ${isUnlocked ? '' : 'grayscale opacity-50'}`}>
-                    {achievement.emoji}
-                </div>
-                <h4 className={`font-semibold text-sm ${isUnlocked ? 'text-green-300' : 'text-gray-400'}`}>
-                    {achievement.name}
-                </h4>
-                <p className="text-xs text-gray-400 mt-1">{achievement.description}</p>
-                {!isUnlocked && progress > 0 && (
-                    <div className="mt-2">
-                        <div className="w-full bg-gray-700 rounded-full h-1">
-                            <div 
-                                className="bg-gradient-to-r from-blue-500 to-cyan-500 h-1 rounded-full transition-all duration-300"
-                                style={{ width: `${Math.min(100, (progress / achievement.requirement) * 100)}%` }}
-                            ></div>
-                        </div>
-                        <p className="text-xs text-blue-400 mt-1">
-                            {progress}/{achievement.requirement}
-                        </p>
+                {isSelected && (
+                    <div className="mt-3 py-1 px-3 bg-amber-500/30 rounded-lg border border-amber-400/50">
+                        <span className="text-amber-300 text-xs font-bold">✅ Aktywna farma</span>
                     </div>
                 )}
-            </div>
-        </div>
-    );
-}
-
-function EquipmentCard({ type, equipment, onBuy, isProcessing, canAfford, isUnlocked, playerLevel }) {
-    const isAvailable = isUnlocked && canAfford;
-    const needsLevel = equipment.level > playerLevel;
-    
-    return (
-        <div className={`border p-6 rounded-2xl transition-all duration-300 ${
-            isAvailable 
-                ? 'border-green-500/50 bg-gradient-to-r from-green-600/20 to-emerald-600/20 hover:border-green-400/70 hover:shadow-lg hover:shadow-green-500/20 hover:scale-105' 
-                : needsLevel
-                    ? 'border-purple-500/30 bg-gradient-to-r from-purple-600/10 to-violet-600/10'
-                    : 'border-red-500/30 bg-gradient-to-r from-red-600/10 to-pink-600/10'
-        }`}>
-            <div className="text-center mb-4">
-                <div className="text-4xl mb-2">{equipment.emoji}</div>
-                <h3 className="text-xl font-semibold text-white">{equipment.name}</h3>
-                <p className="text-sm text-gray-300 mt-1">{equipment.description}</p>
-                
-                <div className="mt-3 space-y-1">
-                    <p className="text-sm">⚡ <span className="text-yellow-400 font-bold">{equipment.hashPower} H/s</span></p>
-                    <p className="text-sm">💰 <span className="text-green-400 font-bold">{equipment.coinsPerSecond} TMT/s</span></p>
-                    <p className="text-sm">🎯 <span className="text-blue-400 font-bold">Poziom {equipment.level}</span></p>
-                </div>
-                
-                <div className="mt-3">
-                    {equipment.price === 0 ? (
-                        <span className="text-green-400 font-bold text-lg">🎁 DARMOWY</span>
-                    ) : (
-                        <span className="text-yellow-400 font-bold text-lg">💎 {equipment.price} TON</span>
-                    )}
-                </div>
-            </div>
-            
-            <button 
-                onClick={() => onBuy(type)} 
-                disabled={isProcessing || !isAvailable || needsLevel} 
-                className={`w-full py-3 px-6 rounded-xl font-bold transition-all duration-300 ${
-                    isProcessing 
-                        ? 'bg-gray-500 text-gray-300 cursor-not-allowed' 
-                        : needsLevel
-                            ? 'bg-purple-600/50 text-purple-300 cursor-not-allowed'
-                            : isAvailable
-                                ? 'bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-500 hover:to-emerald-600 text-white shadow-lg shadow-green-500/30 hover:shadow-green-500/50 active:scale-95'
-                                : 'bg-red-600/50 text-red-300 cursor-not-allowed'
-                }`}
-            >
-                {isProcessing ? "⏳ Tworzenie..." : 
-                 needsLevel ? `🔒 Wymaga poziom ${equipment.level}` :
-                 !canAfford ? "💸 Za drogo" :
-                 equipment.price === 0 ? "🎁 Zdobądź za darmo" : "💰 Kup teraz"}
-            </button>
-        </div>
-    );
-}
-
-// Komponent dla pojedynczego przedmiotu w ekwipunku
-function NftItem({ item, onStake, isProcessing }) {
-    // Sprawdź jaki to typ sprzętu na podstawie nazwy
-    const equipmentType = Object.values(EQUIPMENT_TYPES).find(eq => 
-        item.name.toLowerCase().includes(eq.name.toLowerCase()) || 
-        item.name === eq.name
-    ) || EQUIPMENT_TYPES.basic;
-
-    return (
-        <div className="border border-blue-500/30 bg-gradient-to-r from-gray-700/50 to-gray-600/50 p-4 rounded-xl backdrop-blur-sm hover:border-blue-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/20 hover:scale-105">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h3 className="text-xl font-semibold text-white flex items-center gap-2">
-                        {equipmentType.emoji} {item.name}
-                    </h3>
-                    <p className="text-sm text-blue-300 mt-1">⚡ {equipmentType.hashPower} H/s</p>
-                    <p className="text-xs text-green-300">💰 {equipmentType.coinsPerSecond} TMT/s</p>
-                </div>
-                <button
-                    onClick={() => onStake(item.address)}
-                    disabled={isProcessing}
-                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 disabled:from-gray-500 disabled:to-gray-600 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/30 active:scale-95"
-                >
-                    {isProcessing ? "⏳ Przetwarzanie..." : "🔌 Podłącz"}
-                </button>
             </div>
         </div>
     );
 }
 
 function App() {
-    // 🚀 TELEGRAM WEBAPP INTEGRATION
+    // Telegram WebApp Integration
     const [telegramUser, setTelegramUser] = useState(null);
     
     useEffect(() => {
-        // Sprawdź czy aplikacja działa w Telegram
         if (window.Telegram?.WebApp) {
             window.Telegram.WebApp.ready();
             window.Telegram.WebApp.expand();
             
-            // Pobierz dane użytkownika Telegram
             const user = window.Telegram.WebApp.initDataUnsafe?.user;
             if (user) {
                 setTelegramUser({
@@ -438,6 +281,9 @@ function App() {
     const [lastUpdateTime, setLastUpdateTime] = useState(null);
     const [autoRefreshCountdown, setAutoRefreshCountdown] = useState(30);
 
+    // Mining farms state
+    const [selectedFarm, setSelectedFarm] = useState('earth');
+
     // Daily rewards state
     const [currentStreak, setCurrentStreak] = useState(1);
     const [lastClaimDate, setLastClaimDate] = useState(null);
@@ -453,96 +299,65 @@ function App() {
         endpoint: 'https://testnet.toncenter.com/api/v2/jsonRPC'
     }), []);
 
-    // Oblicz całkowity coins per second i poziom gracza
+    // Player stats calculation
     const playerStats = useMemo(() => {
-        if (!farmData) return { coinsPerSecond: 0, level: 1, totalHashPower: 0 };
+        if (!farmData) return { coinsPerSecond: 0, level: 1, totalHashPower: 0, farmEfficiency: 1.0, energyCost: 0.5 };
         
+        const currentFarm = MINING_FARMS[selectedFarm];
         const totalHashPower = farmData.hashPower;
-        const coinsPerSecond = totalHashPower * 0.0001;
+        const baseCoinsPerSecond = totalHashPower * 0.0001;
+        const coinsPerSecond = baseCoinsPerSecond * currentFarm.efficiency;
         
-        // Poziom na podstawie hash power
         let level = 1;
         if (totalHashPower >= 10000) level = 4;
         else if (totalHashPower >= 2000) level = 3;
         else if (totalHashPower >= 500) level = 2;
         
-        return { coinsPerSecond, level, totalHashPower };
-    }, [farmData]);
+        return { 
+            coinsPerSecond, 
+            level, 
+            totalHashPower,
+            farmEfficiency: currentFarm.efficiency,
+            energyCost: currentFarm.energyCost
+        };
+    }, [farmData, selectedFarm]);
 
-    // Sprawdź czy gracz może odebrać nagrodę dzisiaj
+    // Check unlocked farms
+    const unlockedFarms = useMemo(() => {
+        const unlocked = {};
+        Object.entries(MINING_FARMS).forEach(([key, farm]) => {
+            unlocked[key] = playerStats.level >= farm.unlockLevel;
+        });
+        return unlocked;
+    }, [playerStats.level]);
+
+    // Daily reward status
     const dailyRewardStatus = useMemo(() => {
         const today = new Date().toDateString();
         const canClaim = lastClaimDate !== today;
-        const todayReward = DAILY_REWARDS[currentStreak - 1] || DAILY_REWARDS[6]; // Cycle back to day 7
+        const todayReward = DAILY_REWARDS[currentStreak - 1] || DAILY_REWARDS[6];
         
         return { canClaim, todayReward, today };
     }, [currentStreak, lastClaimDate]);
 
-    // Sprawdź osiągnięcia
-    const unlockedAchievements = useMemo(() => {
-        const unlocked = {};
-        const progress = {};
-        
-        if (farmData) {
-            // First Steps
-            unlocked.firstMiner = inventory.length >= ACHIEVEMENTS.firstMiner.requirement;
-            progress.firstMiner = inventory.length;
-            
-            // Power User
-            unlocked.powerUser = farmData.hashPower >= ACHIEVEMENTS.powerUser.requirement;
-            progress.powerUser = farmData.hashPower;
-            
-            // Tycoon
-            unlocked.tycoon = farmData.hashPower >= ACHIEVEMENTS.tycoon.requirement;
-            progress.tycoon = farmData.hashPower;
-            
-            // Collector
-            unlocked.collector = inventory.length >= ACHIEVEMENTS.collector.requirement;
-            progress.collector = inventory.length;
-            
-            // Millionaire (mock - based on pending rewards)
-            const totalEarned = farmData.pendingRewards / 1e9;
-            unlocked.millionaire = totalEarned >= ACHIEVEMENTS.millionaire.requirement;
-            progress.millionaire = totalEarned;
+    // Farm selection handler
+    const handleFarmSelect = (farmKey) => {
+        if (unlockedFarms[farmKey]) {
+            setSelectedFarm(farmKey);
         }
-        
-        return { unlocked, progress };
-    }, [farmData, inventory]);
+    };
 
-    // Stwórz leaderboard z obecnym graczem
-    const leaderboardWithPlayer = useMemo(() => {
-        if (!farmData || !telegramUser) return MOCK_LEADERBOARD;
-        
-        const currentPlayer = {
-            name: telegramUser.firstName || telegramUser.username || "Ty",
-            hashPower: farmData.hashPower,
-            level: playerStats.level,
-            avatar: "🎮",
-            isCurrentPlayer: true
-        };
-        
-        // Dodaj gracza do listy i posortuj
-        const allPlayers = [...MOCK_LEADERBOARD, currentPlayer];
-        return allPlayers.sort((a, b) => b.hashPower - a.hashPower);
-    }, [farmData, telegramUser, playerStats.level]);
-
-    // Daily reward functions
+    // Daily reward handler
     const handleClaimDaily = (reward) => {
         const today = new Date().toDateString();
         setLastClaimDate(today);
         setClaimedDays(prev => new Set([...prev, currentStreak]));
-        
-        // Increase streak, reset after 7 days
         setCurrentStreak(prev => prev >= 7 ? 1 : prev + 1);
         
-        // Mock reward processing
         alert(`🎁 Odebrano nagrodę: ${reward.name}!`);
-        
-        // In real app, would trigger blockchain transaction
-        console.log("Daily reward claimed:", reward);
     };
 
-    // Lucky wheel functions
+    // Wheel spin handlers
     const handleWheelSpin = (prize) => {
         setIsSpinning(false);
         setWheelPrize(prize);
@@ -550,29 +365,21 @@ function App() {
         setLastSpinDate(new Date().toDateString());
         
         alert(`🎰 Wygrałeś: ${prize.name}!`);
-        
-        // In real app, would trigger blockchain transaction
-        console.log("Wheel prize won:", prize);
     };
 
-    const startWheelSpin = () => {
-        if (!canSpin || isSpinning) return;
-        setIsSpinning(true);
-    };
-
-    // Check if player can spin today
+    // Check daily wheel availability
     useEffect(() => {
         const today = new Date().toDateString();
         setCanSpin(lastSpinDate !== today);
     }, [lastSpinDate]);
 
-    // Fetch wallet balance
+    // API functions
     const fetchWalletBalance = useCallback(async () => {
         if (!wallet) return;
         try {
             const address = Address.parse(wallet.account.address);
             const balance = await client.getBalance(address);
-            setWalletBalance(Number(balance) / 1e9); // Convert from nanoTON to TON
+            setWalletBalance(Number(balance) / 1e9);
         } catch (error) {
             console.error("Błąd pobierania salda:", error);
         }
@@ -587,13 +394,13 @@ function App() {
                 messages: [{ address, amount, payload }]
             };
             await tonConnectUI.sendTransaction(transaction);
-            alert("✅ Transakcja wysłana! Odświeżenie danych może potrwać chwilę.");
+            alert("✅ Transakcja wysłana!");
             setTimeout(() => {
                 fetchAllData();
             }, 15000);
         } catch (error) {
             console.error("Błąd transakcji:", error);
-            alert("❌ Transakcja nie powiodła się. Sprawdź konsolę, aby zobaczyć szczegóły.");
+            alert("❌ Transakcja nie powiodła się.");
         } finally {
             setIsProcessing(false);
         }
@@ -617,9 +424,7 @@ function App() {
     }, [wallet, client]);
 
     const handleClaim = () => {
-        // POPRAWIONY OpCode dla ClaimRewards
-        const claimOpCode = 1906195048; // ✅ Poprawny z sources/output/staking_farm_StakingFarm.ts
-        
+        const claimOpCode = 1906195048;
         const body = beginCell()
             .storeUint(claimOpCode, 32)
             .storeUint(BigInt(Date.now()), 64)
@@ -634,69 +439,43 @@ function App() {
         try {
             const playerAddress = Address.parse(wallet.account.address);
             const collectionAddress = Address.parse(NFT_COLLECTION_ADDRESS);
-
-            console.log("Fetching NFTs for address:", playerAddress.toString());
-            console.log("From collection:", collectionAddress.toString());
-
-            // NAJPIERW spróbuj przez TonAPI
             const rawAddress = playerAddress.toRawString();
             const apiUrl = `https://testnet.tonapi.io/v2/accounts/${rawAddress}/nfts?collection=${collectionAddress.toString()}&limit=100&offset=0&indirect_ownership=false`;
-            console.log("API URL:", apiUrl);
             
             const response = await fetch(apiUrl);
-            
             if (response.ok) {
                 const data = await response.json();
-                console.log("API response data:", data);
-
                 if (data.nft_items && data.nft_items.length > 0) {
-                    console.log("Found NFTs via API:", data.nft_items.length);
                     const items = data.nft_items.map(item => ({
                         address: item.address,
                         name: item.metadata?.name || "Basic GPU",
                         description: item.metadata?.description || "Sprzęt górniczy"
                     }));
                     setInventory(items);
-                    return; // Kończymy tutaj jeśli znaleźliśmy NFT
+                    return;
                 }
             }
 
-            // JEŚLI TonAPI nie znalazł NFT, sprawdź stan kolekcji
-            console.log("TonAPI didn't find NFTs, checking collection state...");
-            
             const collectionUrl = `https://testnet.tonapi.io/v2/nfts/collections/${collectionAddress.toString()}`;
             const collectionResponse = await fetch(collectionUrl);
-            
             if (collectionResponse.ok) {
                 const collectionData = await collectionResponse.json();
-                console.log("Collection data:", collectionData);
-                
                 const nextItemIndex = collectionData.next_item_index || 0;
-                console.log("Collection has", nextItemIndex, "NFTs");
-                
                 if (nextItemIndex > 0) {
-                    // Utwórz NFT na podstawie stanu kolekcji
                     const mockNFTs = [];
                     for (let i = 0; i < nextItemIndex; i++) {
                         mockNFTs.push({
                             address: `collection_nft_${i}`,
                             name: "Basic GPU",
-                            description: "Sprzęt górniczy (symulowany - staking niedostępny)"
+                            description: "Sprzęt górniczy (symulowany)"
                         });
                     }
-                    console.log("Created mock NFTs based on collection state:", mockNFTs);
                     setInventory(mockNFTs);
-                } else {
-                    console.log("Collection is empty");
-                    setInventory([]);
                 }
-            } else {
-                console.log("Failed to fetch collection data");
-                setInventory([]);
             }
         } catch (error) {
             console.error("Błąd pobierania ekwipunku:", error);
-            setInventoryError("❌ Nie udało się pobrać ekwipunku. Spróbuj ponownie za chwilę.");
+            setInventoryError("❌ Nie udało się pobrać ekwipunku.");
         }
     }, [wallet]);
     
@@ -709,32 +488,11 @@ function App() {
             fetchWalletBalance()
         ]);
         setIsLoading(false);
-        setAutoRefreshCountdown(30); // Reset countdown
+        setAutoRefreshCountdown(30);
     }, [wallet, fetchFarmData, fetchInventory, fetchWalletBalance]);
-
-    const handleStake = (nftAddress) => {
-        // Sprawdź czy to mock NFT
-        if (nftAddress.startsWith('collection_nft_')) {
-            alert("⚠️ To jest symulowany NFT. Staking nie jest dostępny dla symulowanych NFT. Aby używać stakingu, potrzebujemy prawdziwych adresów NFT z blockchain.");
-            return;
-        }
-        
-        const body = beginCell()
-            .storeUint(0x5fcc3d14, 32) // Standardowy OpCode dla NftTransfer
-            .storeUint(BigInt(Date.now()), 64)
-            .storeAddress(Address.parse(STAKING_FARM_ADDRESS))
-            .storeAddress(Address.parse(wallet.account.address))
-            .storeBit(false)
-            .storeCoins(toNano('0.01'))
-            .storeBit(false)
-            .endCell();
-        handleTransaction(nftAddress, toNano('0.1').toString(), body.toBoc().toString("base64"));
-    };
 
     const handleBuyEquipment = (equipmentType) => {
         const equipment = EQUIPMENT_TYPES[equipmentType];
-        
-        // Stwórz metadata z odpowiednim typem
         const metadataCell = beginCell()
             .storeStringTail(equipment.name)
             .storeRef(
@@ -744,9 +502,7 @@ function App() {
             )
             .endCell();
         
-        // POPRAWIONY OpCode dla Mint
-        const mintOpCode = 3871065451; // ✅ Poprawny z sources/output/nft_collection_NftCollection.ts
-        
+        const mintOpCode = 3871065451;
         const body = beginCell()
             .storeUint(mintOpCode, 32)
             .storeUint(BigInt(Date.now()), 64)
@@ -754,41 +510,26 @@ function App() {
             .storeRef(metadataCell)
             .endCell();
         
-        // Różne koszty w zależności od typu
         const cost = equipment.price === 0 ? '0.1' : equipment.price.toString();
         handleTransaction(NFT_COLLECTION_ADDRESS, toNano(cost).toString(), body.toBoc().toString("base64"));
     };
     
-    // Auto-refresh effect
+    // Auto-refresh effects
     useEffect(() => {
         if (!wallet) return;
-        
-        fetchAllData(); // Initial load
-        
-        const interval = setInterval(() => {
-            fetchAllData();
-        }, 30000); // 30 seconds
-        
+        fetchAllData();
+        const interval = setInterval(fetchAllData, 30000);
         return () => clearInterval(interval);
     }, [wallet, fetchAllData]);
 
-    // Countdown timer effect
     useEffect(() => {
         if (!wallet) return;
-        
         const countdown = setInterval(() => {
-            setAutoRefreshCountdown(prev => {
-                if (prev <= 1) {
-                    return 30; // Reset to 30
-                }
-                return prev - 1;
-            });
+            setAutoRefreshCountdown(prev => prev <= 1 ? 30 : prev - 1);
         }, 1000);
-        
         return () => clearInterval(countdown);
     }, [wallet]);
 
-    // Initial data fetch when wallet connects
     useEffect(() => {
         if (wallet) {
             fetchAllData();
@@ -807,7 +548,6 @@ function App() {
                         ⛏️ TON Miner Tycoon 💎
                     </h1>
                     
-                    {/* Telegram User Info */}
                     {telegramUser && (
                         <div className="mt-2 p-2 bg-gradient-to-r from-indigo-600/20 to-purple-600/20 rounded-lg border border-indigo-500/30">
                             <p className="text-sm text-indigo-300">
@@ -817,7 +557,15 @@ function App() {
                         </div>
                     )}
                     
-                    {/* Wallet Info Panel */}
+                    {wallet && (
+                        <div className="mt-2 p-2 bg-gradient-to-r from-green-600/20 to-emerald-600/20 rounded-lg border border-green-500/30">
+                            <p className="text-sm text-green-300">
+                                🏭 Aktywna farma: <span className="font-bold text-white">{MINING_FARMS[selectedFarm].emoji} {MINING_FARMS[selectedFarm].name}</span>
+                                <span className="ml-2 text-green-400">({(MINING_FARMS[selectedFarm].efficiency * 100)}% wydajności)</span>
+                            </p>
+                        </div>
+                    )}
+                    
                     {wallet && (
                         <div className="mt-4 p-3 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-xl border border-blue-500/30">
                             <div className="grid grid-cols-2 gap-2 text-sm">
@@ -853,6 +601,14 @@ function App() {
                                         </div>
                                     </>
                                 )}
+                                <div className="flex justify-between">
+                                    <span className="text-red-300">🔋 Energia:</span>
+                                    <span className="text-red-400 font-bold">{playerStats.energyCost} TON/dzień</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-emerald-300">📈 Bonus farmy:</span>
+                                    <span className="text-emerald-400 font-bold">+{((playerStats.farmEfficiency - 1) * 100).toFixed(0)}%</span>
+                                </div>
                             </div>
                             <div className="mt-2 text-center">
                                 <CountdownTimer 
@@ -878,6 +634,16 @@ function App() {
                         }`}
                     >
                         🏭 Farma
+                    </button>
+                    <button 
+                        onClick={() => setView('locations')} 
+                        className={`py-3 px-3 text-xs font-semibold transition-all duration-300 rounded-t-lg whitespace-nowrap ${
+                            view === 'locations' 
+                                ? 'text-amber-400 border-b-2 border-amber-400 bg-gradient-to-t from-amber-400/10 to-transparent' 
+                                : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
+                        }`}
+                    >
+                        🌍 Lokacje
                     </button>
                     <button 
                         onClick={() => setView('inventory')} 
@@ -909,36 +675,6 @@ function App() {
                     >
                         🎁 Nagrody {dailyRewardStatus.canClaim && "●"}
                     </button>
-                    <button 
-                        onClick={() => setView('wheel')} 
-                        className={`py-3 px-3 text-xs font-semibold transition-all duration-300 rounded-t-lg whitespace-nowrap ${
-                            view === 'wheel' 
-                                ? 'text-amber-400 border-b-2 border-amber-400 bg-gradient-to-t from-amber-400/10 to-transparent' 
-                                : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
-                        }`}
-                    >
-                        🎰 Koło {canSpin && "●"}
-                    </button>
-                    <button 
-                        onClick={() => setView('leaderboard')} 
-                        className={`py-3 px-3 text-xs font-semibold transition-all duration-300 rounded-t-lg whitespace-nowrap ${
-                            view === 'leaderboard' 
-                                ? 'text-amber-400 border-b-2 border-amber-400 bg-gradient-to-t from-amber-400/10 to-transparent' 
-                                : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
-                        }`}
-                    >
-                        🏆 Ranking
-                    </button>
-                    <button 
-                        onClick={() => setView('achievements')} 
-                        className={`py-3 px-3 text-xs font-semibold transition-all duration-300 rounded-t-lg whitespace-nowrap ${
-                            view === 'achievements' 
-                                ? 'text-amber-400 border-b-2 border-amber-400 bg-gradient-to-t from-amber-400/10 to-transparent' 
-                                : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
-                        }`}
-                    >
-                        🏅 Osiągnięcia
-                    </button>
                 </nav>
 
                 <main>
@@ -954,9 +690,11 @@ function App() {
                                     <>
                                         <div className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 p-4 rounded-xl border border-blue-500/30">
                                             <p className="text-lg"><strong className="text-blue-300">⚡ Moc Obliczeniowa:</strong> <AnimatedNumber value={farmData.hashPower} suffix=" H/s" /></p>
+                                            <p className="text-sm text-blue-400 mt-1">📈 Z bonusem farmy: <AnimatedNumber value={farmData.hashPower * playerStats.farmEfficiency} suffix=" H/s" /></p>
                                         </div>
                                         <div className="bg-gradient-to-r from-green-600/20 to-emerald-600/20 p-4 rounded-xl border border-green-500/30">
                                             <p className="text-lg"><strong className="text-green-300">💰 Oczekujące Nagrody:</strong> <AnimatedNumber value={farmData.pendingRewards / 1e9} suffix=" TMT" /></p>
+                                            <p className="text-sm text-green-400 mt-1">⚡ Zarobek/s: <AnimatedNumber value={playerStats.coinsPerSecond} suffix=" TMT/s" /></p>
                                         </div>
                                         {lastUpdateTime && (
                                             <div className="text-center text-xs text-gray-400">
@@ -993,6 +731,33 @@ function App() {
                         )
                     )}
 
+                    {view === 'locations' && (
+                        <div className="bg-gradient-to-br from-gray-700/50 to-gray-600/30 backdrop-blur-sm p-6 rounded-2xl space-y-4 border border-gray-600/30">
+                            <h2 className="text-2xl font-bold mb-4 text-center bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
+                                🌍 Lokacje Mining
+                            </h2>
+                            
+                            <div className="grid grid-cols-2 gap-3 max-h-80 overflow-y-auto">
+                                {Object.entries(MINING_FARMS).map(([farmKey, farm]) => (
+                                    <FarmCard
+                                        key={farmKey}
+                                        farmKey={farmKey}
+                                        farm={farm}
+                                        isSelected={selectedFarm === farmKey}
+                                        isUnlocked={unlockedFarms[farmKey]}
+                                        onSelect={handleFarmSelect}
+                                    />
+                                ))}
+                            </div>
+                            
+                            <div className="text-center mt-4 p-3 bg-cyan-600/10 rounded-lg border border-cyan-500/30">
+                                <p className="text-sm text-cyan-300">
+                                    🚀 Wybierz lokację, aby zwiększyć wydajność mining! Każda farma ma różne koszty energii i bonusy.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
                     {view === 'inventory' && (
                          wallet ? (
                             <div className="bg-gradient-to-br from-gray-700/50 to-gray-600/30 backdrop-blur-sm p-6 rounded-2xl text-left space-y-4 border border-gray-600/30">
@@ -1007,9 +772,38 @@ function App() {
                                 )}
                                 {inventoryError && <p className="text-red-400 text-sm bg-red-400/10 p-3 rounded-lg border border-red-400/30">{inventoryError}</p>}
                                 
-                                {inventory.length > 0 && inventory.map(item => (
-                                    <NftItem key={item.address} item={item} onStake={handleStake} isProcessing={isProcessing} />
-                                ))}
+                                {inventory.length > 0 && inventory.map(item => {
+                                    const equipmentType = Object.values(EQUIPMENT_TYPES).find(eq => 
+                                        item.name.toLowerCase().includes(eq.name.toLowerCase()) || 
+                                        item.name === eq.name
+                                    ) || EQUIPMENT_TYPES.basic;
+
+                                    return (
+                                        <div key={item.address} className="border border-blue-500/30 bg-gradient-to-r from-gray-700/50 to-gray-600/50 p-4 rounded-xl backdrop-blur-sm hover:border-blue-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/20 hover:scale-105">
+                                            <div className="flex justify-between items-center">
+                                                <div>
+                                                    <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+                                                        {equipmentType.emoji} {item.name}
+                                                    </h3>
+                                                    <p className="text-sm text-blue-300 mt-1">⚡ {equipmentType.hashPower} H/s</p>
+                                                    <p className="text-xs text-green-300">💰 {equipmentType.coinsPerSecond} TMT/s</p>
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        if (item.address.startsWith('collection_nft_')) {
+                                                            alert("⚠️ To jest symulowany NFT. Staking niedostępny.");
+                                                            return;
+                                                        }
+                                                    }}
+                                                    disabled={isProcessing}
+                                                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 disabled:from-gray-500 disabled:to-gray-600 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/30 active:scale-95"
+                                                >
+                                                    {isProcessing ? "⏳ Przetwarzanie..." : "🔌 Podłącz"}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
 
                                 {!isLoading && inventory.length === 0 && !inventoryError && (
                                     <div className="text-center p-6">
@@ -1037,18 +831,59 @@ function App() {
                                 </h2>
                                 
                                 <div className="grid gap-4">
-                                    {Object.entries(EQUIPMENT_TYPES).map(([type, equipment]) => (
-                                        <EquipmentCard
-                                            key={type}
-                                            type={type}
-                                            equipment={equipment}
-                                            onBuy={handleBuyEquipment}
-                                            isProcessing={isProcessing}
-                                            canAfford={walletBalance !== null && walletBalance >= equipment.price}
-                                            isUnlocked={playerStats.level >= equipment.level}
-                                            playerLevel={playerStats.level}
-                                        />
-                                    ))}
+                                    {Object.entries(EQUIPMENT_TYPES).map(([type, equipment]) => {
+                                        const isAvailable = playerStats.level >= equipment.level && walletBalance >= equipment.price;
+                                        const needsLevel = equipment.level > playerStats.level;
+                                        
+                                        return (
+                                            <div key={type} className={`border p-6 rounded-2xl transition-all duration-300 ${
+                                                isAvailable 
+                                                    ? 'border-green-500/50 bg-gradient-to-r from-green-600/20 to-emerald-600/20 hover:border-green-400/70 hover:shadow-lg hover:shadow-green-500/20 hover:scale-105' 
+                                                    : needsLevel
+                                                        ? 'border-purple-500/30 bg-gradient-to-r from-purple-600/10 to-violet-600/10'
+                                                        : 'border-red-500/30 bg-gradient-to-r from-red-600/10 to-pink-600/10'
+                                            }`}>
+                                                <div className="text-center mb-4">
+                                                    <div className="text-4xl mb-2">{equipment.emoji}</div>
+                                                    <h3 className="text-xl font-semibold text-white">{equipment.name}</h3>
+                                                    <p className="text-sm text-gray-300 mt-1">{equipment.description}</p>
+                                                    
+                                                    <div className="mt-3 space-y-1">
+                                                        <p className="text-sm">⚡ <span className="text-yellow-400 font-bold">{equipment.hashPower} H/s</span></p>
+                                                        <p className="text-sm">💰 <span className="text-green-400 font-bold">{equipment.coinsPerSecond} TMT/s</span></p>
+                                                        <p className="text-sm">🎯 <span className="text-blue-400 font-bold">Poziom {equipment.level}</span></p>
+                                                    </div>
+                                                    
+                                                    <div className="mt-3">
+                                                        {equipment.price === 0 ? (
+                                                            <span className="text-green-400 font-bold text-lg">🎁 DARMOWY</span>
+                                                        ) : (
+                                                            <span className="text-yellow-400 font-bold text-lg">💎 {equipment.price} TON</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                
+                                                <button 
+                                                    onClick={() => handleBuyEquipment(type)} 
+                                                    disabled={isProcessing || !isAvailable || needsLevel} 
+                                                    className={`w-full py-3 px-6 rounded-xl font-bold transition-all duration-300 ${
+                                                        isProcessing 
+                                                            ? 'bg-gray-500 text-gray-300 cursor-not-allowed' 
+                                                            : needsLevel
+                                                                ? 'bg-purple-600/50 text-purple-300 cursor-not-allowed'
+                                                                : isAvailable
+                                                                    ? 'bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-500 hover:to-emerald-600 text-white shadow-lg shadow-green-500/30 hover:shadow-green-500/50 active:scale-95'
+                                                                    : 'bg-red-600/50 text-red-300 cursor-not-allowed'
+                                                    }`}
+                                                >
+                                                    {isProcessing ? "⏳ Tworzenie..." : 
+                                                     needsLevel ? `🔒 Wymaga poziom ${equipment.level}` :
+                                                     !isAvailable ? "💸 Za drogo" :
+                                                     equipment.price === 0 ? "🎁 Zdobądź za darmo" : "💰 Kup teraz"}
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                                 
                                 <div className="text-center mt-4 p-3 bg-blue-600/10 rounded-lg border border-blue-500/30">
@@ -1077,92 +912,43 @@ function App() {
                             </div>
                             
                             <div className="grid grid-cols-2 gap-3 max-h-80 overflow-y-auto">
-                                {DAILY_REWARDS.map((reward, index) => (
-                                    <DailyRewardCard
-                                        key={reward.day}
-                                        reward={reward}
-                                        day={reward.day}
-                                        isClaimed={claimedDays.has(reward.day)}
-                                        isToday={currentStreak === reward.day && dailyRewardStatus.canClaim}
-                                        onClaim={handleClaimDaily}
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {view === 'wheel' && (
-                        <div className="bg-gradient-to-br from-gray-700/50 to-gray-600/30 backdrop-blur-sm p-6 rounded-2xl space-y-4 border border-gray-600/30">
-                            <h2 className="text-2xl font-bold mb-4 text-center bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
-                                🎰 Koło Fortuny
-                            </h2>
-                            
-                            <LuckyWheel
-                                prizes={WHEEL_PRIZES}
-                                onSpin={handleWheelSpin}
-                                isSpinning={isSpinning}
-                                canSpin={canSpin}
-                            />
-                            
-                            {wheelPrize && (
-                                <div className="mt-4 p-4 bg-gradient-to-r from-yellow-600/20 to-orange-600/20 rounded-xl border border-yellow-500/50">
-                                    <div className="text-center">
-                                        <p className="text-yellow-300 font-bold">🏆 Ostatnia wygrana:</p>
-                                        <p className="text-white text-lg">{wheelPrize.emoji} {wheelPrize.name}</p>
-                                    </div>
-                                </div>
-                            )}
-                            
-                            <div className="text-center mt-4 p-3 bg-yellow-600/10 rounded-lg border border-yellow-500/30">
-                                <p className="text-sm text-yellow-300">🎯 Jedna szansa dziennie na wielkie nagrody!</p>
-                            </div>
-                        </div>
-                    )}
-
-                    {view === 'leaderboard' && (
-                        <div className="bg-gradient-to-br from-gray-700/50 to-gray-600/30 backdrop-blur-sm p-6 rounded-2xl space-y-4 border border-gray-600/30">
-                            <h2 className="text-2xl font-bold mb-4 text-center bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
-                                🏆 Ranking Minerów
-                            </h2>
-                            
-                            <div className="space-y-3 max-h-80 overflow-y-auto">
-                                {leaderboardWithPlayer.map((player, index) => (
-                                    <LeaderboardItem
-                                        key={`${player.name}-${index}`}
-                                        player={player}
-                                        rank={index + 1}
-                                        isCurrentPlayer={player.isCurrentPlayer}
-                                    />
-                                ))}
-                            </div>
-                            
-                            <div className="text-center mt-4 p-3 bg-yellow-600/10 rounded-lg border border-yellow-500/30">
-                                <p className="text-sm text-yellow-300">🚀 Zwiększ swoją moc hash, aby wspiąć się w rankingu!</p>
-                            </div>
-                        </div>
-                    )}
-
-                    {view === 'achievements' && (
-                        <div className="bg-gradient-to-br from-gray-700/50 to-gray-600/30 backdrop-blur-sm p-6 rounded-2xl space-y-4 border border-gray-600/30">
-                            <h2 className="text-2xl font-bold mb-4 text-center bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                                🏅 Osiągnięcia
-                            </h2>
-                            
-                            <div className="grid grid-cols-2 gap-3 max-h-80 overflow-y-auto">
-                                {Object.entries(ACHIEVEMENTS).map(([key, achievement]) => (
-                                    <AchievementBadge
-                                        key={key}
-                                        achievement={achievement}
-                                        isUnlocked={unlockedAchievements.unlocked[key] || false}
-                                        progress={unlockedAchievements.progress[key] || 0}
-                                    />
-                                ))}
-                            </div>
-                            
-                            <div className="text-center mt-4 p-3 bg-purple-600/10 rounded-lg border border-purple-500/30">
-                                <p className="text-sm text-purple-300">
-                                    ✨ Odblokowano: {Object.values(unlockedAchievements.unlocked).filter(Boolean).length}/{Object.keys(ACHIEVEMENTS).length}
-                                </p>
+                                {DAILY_REWARDS.map((reward) => {
+                                    const isClaimed = claimedDays.has(reward.day);
+                                    const isToday = currentStreak === reward.day && dailyRewardStatus.canClaim;
+                                    
+                                    return (
+                                        <div key={reward.day} className={`p-4 rounded-xl border transition-all duration-300 ${
+                                            isClaimed 
+                                                ? 'bg-gray-600/30 border-gray-500/50 opacity-60' 
+                                                : isToday
+                                                    ? 'bg-gradient-to-br from-amber-500/30 to-yellow-500/30 border-amber-400/70 shadow-lg shadow-amber-500/30 animate-pulse'
+                                                    : 'bg-gradient-to-br from-blue-600/20 to-purple-600/20 border-blue-500/50'
+                                        }`}>
+                                            <div className="text-center">
+                                                <div className="text-3xl mb-2">{reward.emoji}</div>
+                                                <p className="font-bold text-white text-sm">Dzień {reward.day}</p>
+                                                <p className="text-xs text-gray-300 mb-3">{reward.name}</p>
+                                                
+                                                {isClaimed ? (
+                                                    <div className="py-2 px-4 bg-gray-600 rounded-lg">
+                                                        <span className="text-gray-300 text-sm">✅ Odebrano</span>
+                                                    </div>
+                                                ) : isToday ? (
+                                                    <button 
+                                                        onClick={() => handleClaimDaily(reward)}
+                                                        className="w-full py-2 px-4 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-white font-bold rounded-lg transition-all duration-300 hover:scale-105 active:scale-95"
+                                                    >
+                                                        🎁 Odbierz
+                                                    </button>
+                                                ) : (
+                                                    <div className="py-2 px-4 bg-gray-700 rounded-lg">
+                                                        <span className="text-gray-400 text-sm">🔒 Zablokowane</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
