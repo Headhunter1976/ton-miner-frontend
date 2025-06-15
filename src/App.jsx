@@ -56,6 +56,29 @@ const ACHIEVEMENTS = {
     millionaire: { name: "Millionaire", emoji: "💎", description: "Zarobić 1000 TMT", requirement: 1000 }
 };
 
+// Daily rewards configuration
+const DAILY_REWARDS = [
+    { day: 1, reward: 10, type: "coins", emoji: "💰", name: "10 TMT" },
+    { day: 2, reward: 20, type: "coins", emoji: "💰", name: "20 TMT" },
+    { day: 3, reward: 50, type: "coins", emoji: "💰", name: "50 TMT" },
+    { day: 4, reward: 100, type: "coins", emoji: "💰", name: "100 TMT" },
+    { day: 5, reward: 0.1, type: "ton", emoji: "💎", name: "0.1 TON" },
+    { day: 6, reward: 200, type: "coins", emoji: "💰", name: "200 TMT" },
+    { day: 7, reward: 1, type: "nft", emoji: "🎁", name: "Free NFT" }
+];
+
+// Lucky wheel prizes
+const WHEEL_PRIZES = [
+    { id: 1, name: "5 TMT", emoji: "💰", value: 5, type: "coins", color: "bg-green-500" },
+    { id: 2, name: "10 TMT", emoji: "💰", value: 10, type: "coins", color: "bg-blue-500" },
+    { id: 3, name: "25 TMT", emoji: "💰", value: 25, type: "coins", color: "bg-purple-500" },
+    { id: 4, name: "50 TMT", emoji: "💰", value: 50, type: "coins", color: "bg-yellow-500" },
+    { id: 5, name: "100 TMT", emoji: "🎯", value: 100, type: "coins", color: "bg-orange-500" },
+    { id: 6, name: "0.05 TON", emoji: "💎", value: 0.05, type: "ton", color: "bg-cyan-500" },
+    { id: 7, name: "NFT", emoji: "🎁", value: 1, type: "nft", color: "bg-pink-500" },
+    { id: 8, name: "Jackpot!", emoji: "🏆", value: 500, type: "coins", color: "bg-gradient-to-r from-yellow-400 to-yellow-600" }
+];
+
 // Mock leaderboard data (w prawdziwej aplikacji byłoby z backend)
 const MOCK_LEADERBOARD = [
     { name: "CryptoKing", hashPower: 50000, level: 4, avatar: "👑" },
@@ -118,6 +141,108 @@ function CountdownTimer({ seconds, onComplete }) {
         <span className="text-xs text-blue-300">
             ⏱️ Następne odświeżenie: {timeLeft}s
         </span>
+    );
+}
+
+function DailyRewardCard({ reward, day, isClaimed, isToday, onClaim }) {
+    return (
+        <div className={`p-4 rounded-xl border transition-all duration-300 ${
+            isClaimed 
+                ? 'bg-gray-600/30 border-gray-500/50 opacity-60' 
+                : isToday
+                    ? 'bg-gradient-to-br from-amber-500/30 to-yellow-500/30 border-amber-400/70 shadow-lg shadow-amber-500/30 animate-pulse'
+                    : 'bg-gradient-to-br from-blue-600/20 to-purple-600/20 border-blue-500/50'
+        }`}>
+            <div className="text-center">
+                <div className="text-3xl mb-2">{reward.emoji}</div>
+                <p className="font-bold text-white text-sm">Dzień {day}</p>
+                <p className="text-xs text-gray-300 mb-3">{reward.name}</p>
+                
+                {isClaimed ? (
+                    <div className="py-2 px-4 bg-gray-600 rounded-lg">
+                        <span className="text-gray-300 text-sm">✅ Odebrano</span>
+                    </div>
+                ) : isToday ? (
+                    <button 
+                        onClick={() => onClaim(reward)}
+                        className="w-full py-2 px-4 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-white font-bold rounded-lg transition-all duration-300 hover:scale-105 active:scale-95"
+                    >
+                        🎁 Odbierz
+                    </button>
+                ) : (
+                    <div className="py-2 px-4 bg-gray-700 rounded-lg">
+                        <span className="text-gray-400 text-sm">🔒 Zablokowane</span>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function LuckyWheel({ prizes, onSpin, isSpinning, canSpin }) {
+    const [rotation, setRotation] = useState(0);
+    
+    const handleSpin = () => {
+        if (!canSpin || isSpinning) return;
+        
+        const spins = 5 + Math.random() * 5; // 5-10 pełnych obrotów
+        const finalRotation = rotation + spins * 360 + Math.random() * 360;
+        
+        setRotation(finalRotation);
+        
+        setTimeout(() => {
+            const prizeIndex = Math.floor(Math.random() * prizes.length);
+            onSpin(prizes[prizeIndex]);
+        }, 3000);
+    };
+    
+    return (
+        <div className="text-center">
+            <div className="relative w-64 h-64 mx-auto mb-6">
+                {/* Wheel */}
+                <div 
+                    className={`w-full h-full rounded-full border-8 border-yellow-400 transition-transform duration-3000 ease-out ${isSpinning ? 'animate-spin' : ''}`}
+                    style={{ transform: `rotate(${rotation}deg)` }}
+                >
+                    <div className="relative w-full h-full rounded-full overflow-hidden">
+                        {prizes.map((prize, index) => {
+                            const angle = (360 / prizes.length) * index;
+                            return (
+                                <div
+                                    key={prize.id}
+                                    className={`absolute w-full h-full ${prize.color}`}
+                                    style={{
+                                        clipPath: `polygon(50% 50%, 50% 0%, ${50 + 50 * Math.cos((angle + 360/prizes.length) * Math.PI / 180)}% ${50 - 50 * Math.sin((angle + 360/prizes.length) * Math.PI / 180)}%)`
+                                    }}
+                                >
+                                    <div className="absolute top-4 left-1/2 transform -translate-x-1/2 text-white text-center">
+                                        <div className="text-xl">{prize.emoji}</div>
+                                        <div className="text-xs font-bold">{prize.name}</div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+                
+                {/* Pointer */}
+                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-2">
+                    <div className="w-0 h-0 border-l-4 border-r-4 border-b-8 border-l-transparent border-r-transparent border-b-yellow-400"></div>
+                </div>
+            </div>
+            
+            <button
+                onClick={handleSpin}
+                disabled={!canSpin || isSpinning}
+                className={`py-4 px-8 rounded-xl font-bold text-lg transition-all duration-300 ${
+                    canSpin && !isSpinning
+                        ? 'bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-400 hover:to-orange-500 text-white shadow-lg shadow-yellow-500/30 hover:scale-105 active:scale-95'
+                        : 'bg-gray-500 text-gray-300 cursor-not-allowed'
+                }`}
+            >
+                {isSpinning ? "🎰 Kręci się..." : canSpin ? "🎰 Zakręć kołem!" : "⏰ Przyjdź jutro"}
+            </button>
+        </div>
     );
 }
 
@@ -313,6 +438,17 @@ function App() {
     const [lastUpdateTime, setLastUpdateTime] = useState(null);
     const [autoRefreshCountdown, setAutoRefreshCountdown] = useState(30);
 
+    // Daily rewards state
+    const [currentStreak, setCurrentStreak] = useState(1);
+    const [lastClaimDate, setLastClaimDate] = useState(null);
+    const [claimedDays, setClaimedDays] = useState(new Set());
+    
+    // Lucky wheel state
+    const [isSpinning, setIsSpinning] = useState(false);
+    const [canSpin, setCanSpin] = useState(true);
+    const [lastSpinDate, setLastSpinDate] = useState(null);
+    const [wheelPrize, setWheelPrize] = useState(null);
+
     const client = useMemo(() => new TonClient({
         endpoint: 'https://testnet.toncenter.com/api/v2/jsonRPC'
     }), []);
@@ -332,6 +468,15 @@ function App() {
         
         return { coinsPerSecond, level, totalHashPower };
     }, [farmData]);
+
+    // Sprawdź czy gracz może odebrać nagrodę dzisiaj
+    const dailyRewardStatus = useMemo(() => {
+        const today = new Date().toDateString();
+        const canClaim = lastClaimDate !== today;
+        const todayReward = DAILY_REWARDS[currentStreak - 1] || DAILY_REWARDS[6]; // Cycle back to day 7
+        
+        return { canClaim, todayReward, today };
+    }, [currentStreak, lastClaimDate]);
 
     // Sprawdź osiągnięcia
     const unlockedAchievements = useMemo(() => {
@@ -380,6 +525,46 @@ function App() {
         const allPlayers = [...MOCK_LEADERBOARD, currentPlayer];
         return allPlayers.sort((a, b) => b.hashPower - a.hashPower);
     }, [farmData, telegramUser, playerStats.level]);
+
+    // Daily reward functions
+    const handleClaimDaily = (reward) => {
+        const today = new Date().toDateString();
+        setLastClaimDate(today);
+        setClaimedDays(prev => new Set([...prev, currentStreak]));
+        
+        // Increase streak, reset after 7 days
+        setCurrentStreak(prev => prev >= 7 ? 1 : prev + 1);
+        
+        // Mock reward processing
+        alert(`🎁 Odebrano nagrodę: ${reward.name}!`);
+        
+        // In real app, would trigger blockchain transaction
+        console.log("Daily reward claimed:", reward);
+    };
+
+    // Lucky wheel functions
+    const handleWheelSpin = (prize) => {
+        setIsSpinning(false);
+        setWheelPrize(prize);
+        setCanSpin(false);
+        setLastSpinDate(new Date().toDateString());
+        
+        alert(`🎰 Wygrałeś: ${prize.name}!`);
+        
+        // In real app, would trigger blockchain transaction
+        console.log("Wheel prize won:", prize);
+    };
+
+    const startWheelSpin = () => {
+        if (!canSpin || isSpinning) return;
+        setIsSpinning(true);
+    };
+
+    // Check if player can spin today
+    useEffect(() => {
+        const today = new Date().toDateString();
+        setCanSpin(lastSpinDate !== today);
+    }, [lastSpinDate]);
 
     // Fetch wallet balance
     const fetchWalletBalance = useCallback(async () => {
@@ -627,6 +812,7 @@ function App() {
                         <div className="mt-2 p-2 bg-gradient-to-r from-indigo-600/20 to-purple-600/20 rounded-lg border border-indigo-500/30">
                             <p className="text-sm text-indigo-300">
                                 👋 Witaj, <span className="font-bold text-white">{telegramUser.firstName}</span>!
+                                {dailyRewardStatus.canClaim && <span className="ml-2">🎁</span>}
                             </p>
                         </div>
                     )}
@@ -644,6 +830,16 @@ function App() {
                                 <div className="flex justify-between">
                                     <span className="text-purple-300">🎯 Poziom:</span>
                                     <span className="text-pink-400 font-bold">{playerStats.level}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-orange-300">🔥 Streak:</span>
+                                    <span className="text-orange-400 font-bold">{currentStreak} dni</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-cyan-300">🎰 Koło:</span>
+                                    <span className={`font-bold ${canSpin ? 'text-green-400' : 'text-red-400'}`}>
+                                        {canSpin ? "Dostępne" : "Jutro"}
+                                    </span>
                                 </div>
                                 {playerStats.coinsPerSecond > 0 && (
                                     <>
@@ -672,10 +868,10 @@ function App() {
                     </div>
                 </header>
                 
-                <nav className="flex justify-center border-b border-gray-700/50 mb-6">
+                <nav className="flex justify-center border-b border-gray-700/50 mb-6 overflow-x-auto">
                     <button 
                         onClick={() => setView('farm')} 
-                        className={`py-3 px-4 text-sm font-semibold transition-all duration-300 rounded-t-lg ${
+                        className={`py-3 px-3 text-xs font-semibold transition-all duration-300 rounded-t-lg whitespace-nowrap ${
                             view === 'farm' 
                                 ? 'text-amber-400 border-b-2 border-amber-400 bg-gradient-to-t from-amber-400/10 to-transparent' 
                                 : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
@@ -685,7 +881,7 @@ function App() {
                     </button>
                     <button 
                         onClick={() => setView('inventory')} 
-                        className={`py-3 px-4 text-sm font-semibold transition-all duration-300 rounded-t-lg ${
+                        className={`py-3 px-3 text-xs font-semibold transition-all duration-300 rounded-t-lg whitespace-nowrap ${
                             view === 'inventory' 
                                 ? 'text-amber-400 border-b-2 border-amber-400 bg-gradient-to-t from-amber-400/10 to-transparent' 
                                 : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
@@ -695,7 +891,7 @@ function App() {
                     </button>
                     <button 
                         onClick={() => setView('shop')} 
-                        className={`py-3 px-4 text-sm font-semibold transition-all duration-300 rounded-t-lg ${
+                        className={`py-3 px-3 text-xs font-semibold transition-all duration-300 rounded-t-lg whitespace-nowrap ${
                             view === 'shop' 
                                 ? 'text-amber-400 border-b-2 border-amber-400 bg-gradient-to-t from-amber-400/10 to-transparent' 
                                 : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
@@ -704,8 +900,28 @@ function App() {
                         🏪 Sklep
                     </button>
                     <button 
+                        onClick={() => setView('rewards')} 
+                        className={`py-3 px-3 text-xs font-semibold transition-all duration-300 rounded-t-lg whitespace-nowrap ${
+                            view === 'rewards' 
+                                ? 'text-amber-400 border-b-2 border-amber-400 bg-gradient-to-t from-amber-400/10 to-transparent' 
+                                : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
+                        }`}
+                    >
+                        🎁 Nagrody {dailyRewardStatus.canClaim && "●"}
+                    </button>
+                    <button 
+                        onClick={() => setView('wheel')} 
+                        className={`py-3 px-3 text-xs font-semibold transition-all duration-300 rounded-t-lg whitespace-nowrap ${
+                            view === 'wheel' 
+                                ? 'text-amber-400 border-b-2 border-amber-400 bg-gradient-to-t from-amber-400/10 to-transparent' 
+                                : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
+                        }`}
+                    >
+                        🎰 Koło {canSpin && "●"}
+                    </button>
+                    <button 
                         onClick={() => setView('leaderboard')} 
-                        className={`py-3 px-4 text-sm font-semibold transition-all duration-300 rounded-t-lg ${
+                        className={`py-3 px-3 text-xs font-semibold transition-all duration-300 rounded-t-lg whitespace-nowrap ${
                             view === 'leaderboard' 
                                 ? 'text-amber-400 border-b-2 border-amber-400 bg-gradient-to-t from-amber-400/10 to-transparent' 
                                 : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
@@ -715,7 +931,7 @@ function App() {
                     </button>
                     <button 
                         onClick={() => setView('achievements')} 
-                        className={`py-3 px-4 text-sm font-semibold transition-all duration-300 rounded-t-lg ${
+                        className={`py-3 px-3 text-xs font-semibold transition-all duration-300 rounded-t-lg whitespace-nowrap ${
                             view === 'achievements' 
                                 ? 'text-amber-400 border-b-2 border-amber-400 bg-gradient-to-t from-amber-400/10 to-transparent' 
                                 : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
@@ -847,6 +1063,60 @@ function App() {
                                 </div>
                             </div>
                         )
+                    )}
+
+                    {view === 'rewards' && (
+                        <div className="bg-gradient-to-br from-gray-700/50 to-gray-600/30 backdrop-blur-sm p-6 rounded-2xl space-y-4 border border-gray-600/30">
+                            <h2 className="text-2xl font-bold mb-4 text-center bg-gradient-to-r from-amber-400 to-yellow-400 bg-clip-text text-transparent">
+                                🎁 Codzienne Nagrody
+                            </h2>
+                            
+                            <div className="text-center mb-4 p-3 bg-amber-600/10 rounded-lg border border-amber-500/30">
+                                <p className="text-amber-300 font-bold">🔥 Obecna seria: {currentStreak} dni</p>
+                                <p className="text-xs text-amber-400 mt-1">Nie przegap ani jednego dnia!</p>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-3 max-h-80 overflow-y-auto">
+                                {DAILY_REWARDS.map((reward, index) => (
+                                    <DailyRewardCard
+                                        key={reward.day}
+                                        reward={reward}
+                                        day={reward.day}
+                                        isClaimed={claimedDays.has(reward.day)}
+                                        isToday={currentStreak === reward.day && dailyRewardStatus.canClaim}
+                                        onClaim={handleClaimDaily}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {view === 'wheel' && (
+                        <div className="bg-gradient-to-br from-gray-700/50 to-gray-600/30 backdrop-blur-sm p-6 rounded-2xl space-y-4 border border-gray-600/30">
+                            <h2 className="text-2xl font-bold mb-4 text-center bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
+                                🎰 Koło Fortuny
+                            </h2>
+                            
+                            <LuckyWheel
+                                prizes={WHEEL_PRIZES}
+                                onSpin={handleWheelSpin}
+                                isSpinning={isSpinning}
+                                canSpin={canSpin}
+                            />
+                            
+                            {wheelPrize && (
+                                <div className="mt-4 p-4 bg-gradient-to-r from-yellow-600/20 to-orange-600/20 rounded-xl border border-yellow-500/50">
+                                    <div className="text-center">
+                                        <p className="text-yellow-300 font-bold">🏆 Ostatnia wygrana:</p>
+                                        <p className="text-white text-lg">{wheelPrize.emoji} {wheelPrize.name}</p>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            <div className="text-center mt-4 p-3 bg-yellow-600/10 rounded-lg border border-yellow-500/30">
+                                <p className="text-sm text-yellow-300">🎯 Jedna szansa dziennie na wielkie nagrody!</p>
+                            </div>
+                        </div>
                     )}
 
                     {view === 'leaderboard' && (
