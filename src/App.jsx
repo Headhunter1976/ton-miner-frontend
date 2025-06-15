@@ -47,6 +47,24 @@ const EQUIPMENT_TYPES = {
     }
 };
 
+// Achievements system
+const ACHIEVEMENTS = {
+    firstMiner: { name: "First Steps", emoji: "👶", description: "Kup swój pierwszy sprzęt", requirement: 1 },
+    powerUser: { name: "Power User", emoji: "💪", description: "Osiągnij 1000 H/s", requirement: 1000 },
+    tycoon: { name: "Mining Tycoon", emoji: "👑", description: "Osiągnij 10000 H/s", requirement: 10000 },
+    collector: { name: "Collector", emoji: "🎒", description: "Posiadaj 5 NFT", requirement: 5 },
+    millionaire: { name: "Millionaire", emoji: "💎", description: "Zarobić 1000 TMT", requirement: 1000 }
+};
+
+// Mock leaderboard data (w prawdziwej aplikacji byłoby z backend)
+const MOCK_LEADERBOARD = [
+    { name: "CryptoKing", hashPower: 50000, level: 4, avatar: "👑" },
+    { name: "MinerPro", hashPower: 25000, level: 4, avatar: "⚡" },
+    { name: "HashMaster", hashPower: 15000, level: 3, avatar: "🚀" },
+    { name: "BitDigger", hashPower: 8000, level: 3, avatar: "⛏️" },
+    { name: "TonFan", hashPower: 5000, level: 2, avatar: "💎" }
+];
+
 // Komponenty pomocnicze
 function AnimatedNumber({ value, suffix = "", prefix = "" }) {
     const [displayValue, setDisplayValue] = useState(value);
@@ -100,6 +118,72 @@ function CountdownTimer({ seconds, onComplete }) {
         <span className="text-xs text-blue-300">
             ⏱️ Następne odświeżenie: {timeLeft}s
         </span>
+    );
+}
+
+function LeaderboardItem({ player, rank, isCurrentPlayer = false }) {
+    const getRankEmoji = (rank) => {
+        if (rank === 1) return "🥇";
+        if (rank === 2) return "🥈";
+        if (rank === 3) return "🥉";
+        return `#${rank}`;
+    };
+
+    return (
+        <div className={`flex items-center justify-between p-3 rounded-lg transition-all duration-300 ${
+            isCurrentPlayer 
+                ? 'bg-gradient-to-r from-amber-600/30 to-yellow-600/30 border border-amber-500/50 shadow-lg shadow-amber-500/20' 
+                : 'bg-gradient-to-r from-gray-600/20 to-gray-500/20 hover:from-gray-600/30 hover:to-gray-500/30'
+        }`}>
+            <div className="flex items-center gap-3">
+                <span className="text-xl font-bold">{getRankEmoji(rank)}</span>
+                <div className="flex items-center gap-2">
+                    <span className="text-2xl">{player.avatar}</span>
+                    <div>
+                        <p className={`font-semibold ${isCurrentPlayer ? 'text-amber-300' : 'text-white'}`}>
+                            {player.name} {isCurrentPlayer && "(Ty)"}
+                        </p>
+                        <p className="text-xs text-gray-400">Poziom {player.level}</p>
+                    </div>
+                </div>
+            </div>
+            <div className="text-right">
+                <p className="font-bold text-cyan-400">{player.hashPower.toLocaleString()} H/s</p>
+            </div>
+        </div>
+    );
+}
+
+function AchievementBadge({ achievement, isUnlocked, progress = 0 }) {
+    return (
+        <div className={`p-3 rounded-lg border transition-all duration-300 ${
+            isUnlocked 
+                ? 'bg-gradient-to-r from-green-600/20 to-emerald-600/20 border-green-500/50 shadow-lg shadow-green-500/20' 
+                : 'bg-gradient-to-r from-gray-600/10 to-gray-500/10 border-gray-500/30'
+        }`}>
+            <div className="text-center">
+                <div className={`text-3xl mb-1 ${isUnlocked ? '' : 'grayscale opacity-50'}`}>
+                    {achievement.emoji}
+                </div>
+                <h4 className={`font-semibold text-sm ${isUnlocked ? 'text-green-300' : 'text-gray-400'}`}>
+                    {achievement.name}
+                </h4>
+                <p className="text-xs text-gray-400 mt-1">{achievement.description}</p>
+                {!isUnlocked && progress > 0 && (
+                    <div className="mt-2">
+                        <div className="w-full bg-gray-700 rounded-full h-1">
+                            <div 
+                                className="bg-gradient-to-r from-blue-500 to-cyan-500 h-1 rounded-full transition-all duration-300"
+                                style={{ width: `${Math.min(100, (progress / achievement.requirement) * 100)}%` }}
+                            ></div>
+                        </div>
+                        <p className="text-xs text-blue-400 mt-1">
+                            {progress}/{achievement.requirement}
+                        </p>
+                    </div>
+                )}
+            </div>
+        </div>
     );
 }
 
@@ -189,15 +273,23 @@ function NftItem({ item, onStake, isProcessing }) {
 
 function App() {
     // 🚀 TELEGRAM WEBAPP INTEGRATION
+    const [telegramUser, setTelegramUser] = useState(null);
+    
     useEffect(() => {
         // Sprawdź czy aplikacja działa w Telegram
         if (window.Telegram?.WebApp) {
             window.Telegram.WebApp.ready();
             window.Telegram.WebApp.expand();
             
-            // Opcjonalnie: pobierz dane użytkownika Telegram
+            // Pobierz dane użytkownika Telegram
             const user = window.Telegram.WebApp.initDataUnsafe?.user;
             if (user) {
+                setTelegramUser({
+                    firstName: user.first_name,
+                    lastName: user.last_name,
+                    username: user.username,
+                    id: user.id
+                });
                 console.log('🎮 Telegram user:', user.first_name);
             }
             
@@ -240,6 +332,54 @@ function App() {
         
         return { coinsPerSecond, level, totalHashPower };
     }, [farmData]);
+
+    // Sprawdź osiągnięcia
+    const unlockedAchievements = useMemo(() => {
+        const unlocked = {};
+        const progress = {};
+        
+        if (farmData) {
+            // First Steps
+            unlocked.firstMiner = inventory.length >= ACHIEVEMENTS.firstMiner.requirement;
+            progress.firstMiner = inventory.length;
+            
+            // Power User
+            unlocked.powerUser = farmData.hashPower >= ACHIEVEMENTS.powerUser.requirement;
+            progress.powerUser = farmData.hashPower;
+            
+            // Tycoon
+            unlocked.tycoon = farmData.hashPower >= ACHIEVEMENTS.tycoon.requirement;
+            progress.tycoon = farmData.hashPower;
+            
+            // Collector
+            unlocked.collector = inventory.length >= ACHIEVEMENTS.collector.requirement;
+            progress.collector = inventory.length;
+            
+            // Millionaire (mock - based on pending rewards)
+            const totalEarned = farmData.pendingRewards / 1e9;
+            unlocked.millionaire = totalEarned >= ACHIEVEMENTS.millionaire.requirement;
+            progress.millionaire = totalEarned;
+        }
+        
+        return { unlocked, progress };
+    }, [farmData, inventory]);
+
+    // Stwórz leaderboard z obecnym graczem
+    const leaderboardWithPlayer = useMemo(() => {
+        if (!farmData || !telegramUser) return MOCK_LEADERBOARD;
+        
+        const currentPlayer = {
+            name: telegramUser.firstName || telegramUser.username || "Ty",
+            hashPower: farmData.hashPower,
+            level: playerStats.level,
+            avatar: "🎮",
+            isCurrentPlayer: true
+        };
+        
+        // Dodaj gracza do listy i posortuj
+        const allPlayers = [...MOCK_LEADERBOARD, currentPlayer];
+        return allPlayers.sort((a, b) => b.hashPower - a.hashPower);
+    }, [farmData, telegramUser, playerStats.level]);
 
     // Fetch wallet balance
     const fetchWalletBalance = useCallback(async () => {
@@ -328,7 +468,7 @@ function App() {
                     console.log("Found NFTs via API:", data.nft_items.length);
                     const items = data.nft_items.map(item => ({
                         address: item.address,
-                        name: item.metadata?.name || "Mining Rig Basic",
+                        name: item.metadata?.name || "Basic GPU",
                         description: item.metadata?.description || "Sprzęt górniczy"
                     }));
                     setInventory(items);
@@ -482,6 +622,15 @@ function App() {
                         ⛏️ TON Miner Tycoon 💎
                     </h1>
                     
+                    {/* Telegram User Info */}
+                    {telegramUser && (
+                        <div className="mt-2 p-2 bg-gradient-to-r from-indigo-600/20 to-purple-600/20 rounded-lg border border-indigo-500/30">
+                            <p className="text-sm text-indigo-300">
+                                👋 Witaj, <span className="font-bold text-white">{telegramUser.firstName}</span>!
+                            </p>
+                        </div>
+                    )}
+                    
                     {/* Wallet Info Panel */}
                     {wallet && (
                         <div className="mt-4 p-3 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-xl border border-blue-500/30">
@@ -526,7 +675,7 @@ function App() {
                 <nav className="flex justify-center border-b border-gray-700/50 mb-6">
                     <button 
                         onClick={() => setView('farm')} 
-                        className={`py-3 px-5 text-lg font-semibold transition-all duration-300 rounded-t-lg ${
+                        className={`py-3 px-4 text-sm font-semibold transition-all duration-300 rounded-t-lg ${
                             view === 'farm' 
                                 ? 'text-amber-400 border-b-2 border-amber-400 bg-gradient-to-t from-amber-400/10 to-transparent' 
                                 : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
@@ -536,7 +685,7 @@ function App() {
                     </button>
                     <button 
                         onClick={() => setView('inventory')} 
-                        className={`py-3 px-5 text-lg font-semibold transition-all duration-300 rounded-t-lg ${
+                        className={`py-3 px-4 text-sm font-semibold transition-all duration-300 rounded-t-lg ${
                             view === 'inventory' 
                                 ? 'text-amber-400 border-b-2 border-amber-400 bg-gradient-to-t from-amber-400/10 to-transparent' 
                                 : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
@@ -546,13 +695,33 @@ function App() {
                     </button>
                     <button 
                         onClick={() => setView('shop')} 
-                        className={`py-3 px-5 text-lg font-semibold transition-all duration-300 rounded-t-lg ${
+                        className={`py-3 px-4 text-sm font-semibold transition-all duration-300 rounded-t-lg ${
                             view === 'shop' 
                                 ? 'text-amber-400 border-b-2 border-amber-400 bg-gradient-to-t from-amber-400/10 to-transparent' 
                                 : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
                         }`}
                     >
                         🏪 Sklep
+                    </button>
+                    <button 
+                        onClick={() => setView('leaderboard')} 
+                        className={`py-3 px-4 text-sm font-semibold transition-all duration-300 rounded-t-lg ${
+                            view === 'leaderboard' 
+                                ? 'text-amber-400 border-b-2 border-amber-400 bg-gradient-to-t from-amber-400/10 to-transparent' 
+                                : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
+                        }`}
+                    >
+                        🏆 Ranking
+                    </button>
+                    <button 
+                        onClick={() => setView('achievements')} 
+                        className={`py-3 px-4 text-sm font-semibold transition-all duration-300 rounded-t-lg ${
+                            view === 'achievements' 
+                                ? 'text-amber-400 border-b-2 border-amber-400 bg-gradient-to-t from-amber-400/10 to-transparent' 
+                                : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
+                        }`}
+                    >
+                        🏅 Osiągnięcia
                     </button>
                 </nav>
 
@@ -678,6 +847,54 @@ function App() {
                                 </div>
                             </div>
                         )
+                    )}
+
+                    {view === 'leaderboard' && (
+                        <div className="bg-gradient-to-br from-gray-700/50 to-gray-600/30 backdrop-blur-sm p-6 rounded-2xl space-y-4 border border-gray-600/30">
+                            <h2 className="text-2xl font-bold mb-4 text-center bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
+                                🏆 Ranking Minerów
+                            </h2>
+                            
+                            <div className="space-y-3 max-h-80 overflow-y-auto">
+                                {leaderboardWithPlayer.map((player, index) => (
+                                    <LeaderboardItem
+                                        key={`${player.name}-${index}`}
+                                        player={player}
+                                        rank={index + 1}
+                                        isCurrentPlayer={player.isCurrentPlayer}
+                                    />
+                                ))}
+                            </div>
+                            
+                            <div className="text-center mt-4 p-3 bg-yellow-600/10 rounded-lg border border-yellow-500/30">
+                                <p className="text-sm text-yellow-300">🚀 Zwiększ swoją moc hash, aby wspiąć się w rankingu!</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {view === 'achievements' && (
+                        <div className="bg-gradient-to-br from-gray-700/50 to-gray-600/30 backdrop-blur-sm p-6 rounded-2xl space-y-4 border border-gray-600/30">
+                            <h2 className="text-2xl font-bold mb-4 text-center bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                                🏅 Osiągnięcia
+                            </h2>
+                            
+                            <div className="grid grid-cols-2 gap-3 max-h-80 overflow-y-auto">
+                                {Object.entries(ACHIEVEMENTS).map(([key, achievement]) => (
+                                    <AchievementBadge
+                                        key={key}
+                                        achievement={achievement}
+                                        isUnlocked={unlockedAchievements.unlocked[key] || false}
+                                        progress={unlockedAchievements.progress[key] || 0}
+                                    />
+                                ))}
+                            </div>
+                            
+                            <div className="text-center mt-4 p-3 bg-purple-600/10 rounded-lg border border-purple-500/30">
+                                <p className="text-sm text-purple-300">
+                                    ✨ Odblokowano: {Object.values(unlockedAchievements.unlocked).filter(Boolean).length}/{Object.keys(ACHIEVEMENTS).length}
+                                </p>
+                            </div>
+                        </div>
                     )}
                 </main>
             </div>
