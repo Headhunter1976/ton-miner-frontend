@@ -9,10 +9,10 @@ const STAKING_FARM_ADDRESS = "EQC8MN1ykQZtHHHrWHGSOFyMB7tihHyL3paweoV8DFcJ7V3g";
 const NFT_COLLECTION_ADDRESS = "EQA1W7wNN-dwYQIcfUZXk8BEZsNGlGiWB3sskFrYLPZis36m";
 
 const MINING_FARMS = {
-    earth: { name: "Earth Base", emoji: "🌍", description: "Podstawowa farma na Ziemi", efficiency: 1.0, energyCost: 0.5, temperature: "20°C", unlockLevel: 1, background: "from-green-900/30 to-blue-900/30", border: "border-green-500/30" },
-    arctic: { name: "Arctic Mine", emoji: "🌨️", description: "Zimna kopalnia z naturalnym chłodzeniem", efficiency: 1.2, energyCost: 0.3, temperature: "-40°C", unlockLevel: 2, background: "from-cyan-900/30 to-blue-900/30", border: "border-cyan-500/30" },
-    desert: { name: "Desert Solar", emoji: "🏜️", description: "Pustynna farma solarna", efficiency: 1.5, energyCost: 0.1, temperature: "45°C", unlockLevel: 3, background: "from-yellow-900/30 to-orange-900/30", border: "border-yellow-500/30" },
-    space: { name: "Space Station", emoji: "🚀", description: "Kosmiczna stacja mining", efficiency: 2.0, energyCost: 0.8, temperature: "-270°C", unlockLevel: 4, background: "from-purple-900/30 to-indigo-900/30", border: "border-purple-500/30" }
+    earth: { name: "Baza na Ziemi", emoji: "🌍", description: "Podstawowa farma na Ziemi.", efficiency: 1.0, unlockLevel: 1, background: "from-green-900/30 to-blue-900/30", border: "border-green-500/30" },
+    arctic: { name: "Kopalnia Arktyczna", emoji: "🌨️", description: "Zimna kopalnia z naturalnym chłodzeniem.", efficiency: 1.2, unlockLevel: 2, background: "from-cyan-900/30 to-blue-900/30", border: "border-cyan-500/30" },
+    desert: { name: "Farma Słoneczna", emoji: "🏜️", description: "Pustynna farma zasilana słońcem.", efficiency: 1.5, unlockLevel: 3, background: "from-yellow-900/30 to-orange-900/30", border: "border-yellow-500/30" },
+    space: { name: "Stacja Kosmiczna", emoji: "🚀", description: "Wydajne kopanie w zerowej grawitacji.", efficiency: 2.0, unlockLevel: 4, background: "from-purple-900/30 to-indigo-900/30", border: "border-purple-500/30" }
 };
 
 const EQUIPMENT_TYPES = {
@@ -23,12 +23,12 @@ const EQUIPMENT_TYPES = {
 };
 
 const ACHIEVEMENTS = {
-    firstMiner: { name: "Pierwsze Kroki", emoji: "👶", description: "Kup swój pierwszy sprzęt", requirement: 1 },
-    powerUser: { name: "Użytkownik Mocy", emoji: "💪", description: "Osiągnij 1000 H/s", requirement: 1000 },
-    tycoon: { name: "Magnat Miningu", emoji: "👑", description: "Osiągnij 10000 H/s", requirement: 10000 },
-    collector: { name: "Kolekcjoner", emoji: "🎒", description: "Posiadaj 5 różnych NFT", requirement: 5 },
-    millionaire: { name: "Milioner", emoji: "💎", description: "Zarób 1000 TMT", requirement: 1000 },
-    explorer: { name: "Odkrywca", emoji: "🚀", description: "Odblokuj Stację Kosmiczną", requirement: 1 },
+    firstMiner: { name: "Pierwsze Kroki", emoji: "👶", description: "Kup swój pierwszy sprzęt.", requirement: 1 },
+    powerUser: { name: "Użytkownik Mocy", emoji: "💪", description: "Osiągnij 1000 H/s.", requirement: 1000 },
+    tycoon: { name: "Magnat Miningu", emoji: "👑", description: "Osiągnij 10000 H/s.", requirement: 10000 },
+    collector: { name: "Kolekcjoner", emoji: "🎒", description: "Posiadaj 5 różnych NFT.", requirement: 5 },
+    millionaire: { name: "Milioner", emoji: "💎", description: "Zarób 1000 TMT.", requirement: 1000 },
+    explorer: { name: "Odkrywca", emoji: "🚀", description: "Odblokuj Stację Kosmiczną.", requirement: 1 },
 };
 
 // --- Komponenty Pomocnicze i UI ---
@@ -60,7 +60,7 @@ function AnimatedNumber({ value, suffix = "", prefix = "" }) {
     
     return (
         <span className="font-bold text-yellow-400 transition-all duration-300">
-            {prefix}{displayValue.toFixed(4)}{suffix}
+            {prefix}{value.toFixed(4)}{suffix}
         </span>
     );
 }
@@ -81,13 +81,9 @@ function FarmCard({ farmKey, farm, isSelected, isUnlocked, onSelect }) {
                 <div className="text-4xl mb-2">{farm.emoji}</div>
                 <h3 className="font-bold text-white text-lg">{farm.name}</h3>
                 <p className="text-xs text-gray-300 mt-1">{farm.description}</p>
-                <div className="mt-3 space-y-1 text-xs">
+                 <div className="mt-3 space-y-1 text-xs">
                     <div className="flex justify-between">
-                        <span className="text-blue-300">🌡️ Temp:</span>
-                        <span className="text-white font-bold">{farm.temperature}</span>
-                    </div>
-                    <div className="flex justify-between">
-                        <span className="text-green-300">⚡ Efekt:</span>
+                        <span className="text-green-300">⚡ Efektywność:</span>
                         <span className="text-green-400 font-bold">x{farm.efficiency}</span>
                     </div>
                 </div>
@@ -129,7 +125,6 @@ function NftItem({ item, onStake, isProcessing }) {
 function App() {
     const wallet = useTonWallet();
     const [tonConnectUI] = useTonConnectUI();
-
     const [view, setView] = useState('farm');
     
     // Dane z blockchaina
@@ -151,8 +146,7 @@ function App() {
         endpoint: 'https://testnet.toncenter.com/api/v2/jsonRPC'
     }), []);
     
-    // --- LOGIKA ZAPISU I WCZYTYWANIA DANYCH (TELEGRAM CLOUD STORAGE) ---
-
+    // --- LOGIKA ZAPISU I WCZYTYWANIA DANYCH ---
     const loadGameState = useCallback(() => {
         if (window.Telegram?.WebApp?.CloudStorage) {
             window.Telegram.WebApp.CloudStorage.getItem('playerData', (err, value) => {
@@ -183,6 +177,14 @@ function App() {
 
 
     // --- GŁÓWNA LOGIKA APLIKACJI ---
+
+    const fetchAllData = useCallback(async () => {
+        if (!wallet) return;
+        setIsLoading(true);
+        console.log("Fetching all data...");
+        await Promise.all([fetchFarmData(), fetchInventory()]);
+        setIsLoading(false);
+    }, [wallet]); // Zależności zostaną dodane w głównym useEffect
 
     const handleTransaction = async (address, amount, payload) => {
         if (!wallet) return;
@@ -221,7 +223,7 @@ function App() {
     }, [wallet, client]);
 
     const handleClaim = () => {
-        const claimOpCode = 1906195048; // Pamiętaj, aby podmienić na prawdziwy
+        const claimOpCode = 1906195048;
         const body = beginCell().storeUint(claimOpCode, 32).storeUint(BigInt(Date.now()), 64).endCell();
         handleTransaction(STAKING_FARM_ADDRESS, toNano('0.05').toString(), body.toBoc().toString("base64"));
     };
@@ -275,7 +277,7 @@ function App() {
             }))
             .endCell();
         
-        const mintOpCode = 3871065451; // Pamiętaj, aby podmienić na prawdziwy
+        const mintOpCode = 3871065451;
         
         const body = beginCell()
             .storeUint(mintOpCode, 32)
@@ -286,26 +288,22 @@ function App() {
         handleTransaction(NFT_COLLECTION_ADDRESS, toNano(equipment.price + 0.1).toString(), body.toBoc().toString("base64"));
     };
     
-    const fetchAllData = useCallback(async () => {
-        if (!wallet) return;
-        setIsLoading(true);
-        await Promise.all([fetchFarmData(), fetchInventory()]);
-        setIsLoading(false);
-    }, [wallet, fetchFarmData, fetchInventory]);
-
     useEffect(() => {
         if (window.Telegram?.WebApp) {
             window.Telegram.WebApp.ready();
             window.Telegram.WebApp.expand();
             loadGameState();
         }
+    }, [loadGameState]);
+    
+    useEffect(() => {
         if (wallet) {
             fetchAllData();
         } else {
             setFarmData(null);
             setInventory([]);
         }
-    }, [wallet, fetchAllData, loadGameState]);
+    }, [wallet, fetchAllData]);
 
     const playerLevel = useMemo(() => {
         if (!farmData) return 1;
