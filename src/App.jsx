@@ -7,6 +7,62 @@ import { toNano, beginCell } from '@ton/core';
 const STAKING_FARM_ADDRESS = "EQC8MN1ykQZtHHHrWHGSOFyMB7tihHyL3paweoV8DFcJ7V3g";
 const NFT_COLLECTION_ADDRESS = "EQA1W7wNN-dwYQIcfUZXk8BEZsNGlGiWB3sskFrYLPZis36m";
 
+// Komponenty pomocnicze
+function AnimatedNumber({ value, suffix = "", prefix = "" }) {
+    const [displayValue, setDisplayValue] = useState(value);
+    
+    useEffect(() => {
+        if (value !== displayValue) {
+            const duration = 1000; // 1 sekunda animacji
+            const steps = 30;
+            const stepValue = (value - displayValue) / steps;
+            const stepTime = duration / steps;
+            
+            let currentStep = 0;
+            const timer = setInterval(() => {
+                currentStep++;
+                if (currentStep >= steps) {
+                    setDisplayValue(value);
+                    clearInterval(timer);
+                } else {
+                    setDisplayValue(prev => prev + stepValue);
+                }
+            }, stepTime);
+            
+            return () => clearInterval(timer);
+        }
+    }, [value, displayValue]);
+    
+    return (
+        <span className="font-bold text-yellow-400 transition-all duration-300">
+            {prefix}{displayValue.toFixed(4)}{suffix}
+        </span>
+    );
+}
+
+function CountdownTimer({ seconds, onComplete }) {
+    const [timeLeft, setTimeLeft] = useState(seconds);
+    
+    useEffect(() => {
+        if (timeLeft <= 0) {
+            onComplete();
+            return;
+        }
+        
+        const timer = setTimeout(() => {
+            setTimeLeft(timeLeft - 1);
+        }, 1000);
+        
+        return () => clearTimeout(timer);
+    }, [timeLeft, onComplete]);
+    
+    return (
+        <span className="text-xs text-blue-300">
+            ⏱️ Następne odświeżenie: {timeLeft}s
+        </span>
+    );
+}
+
 // Komponent dla pojedynczego przedmiotu w ekwipunku
 function NftItem({ item, onStake, isProcessing }) {
     return (
@@ -57,13 +113,35 @@ function App() {
     const [farmData, setFarmData] = useState(null);
     const [inventory, setInventory] = useState([]);
     const [inventoryError, setInventoryError] = useState(null);
+    const [walletBalance, setWalletBalance] = useState(null);
     
     const [isLoading, setIsLoading] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [lastUpdateTime, setLastUpdateTime] = useState(null);
+    const [autoRefreshCountdown, setAutoRefreshCountdown] = useState(30);
 
     const client = useMemo(() => new TonClient({
         endpoint: 'https://testnet.toncenter.com/api/v2/jsonRPC'
     }), []);
+
+    // Oblicz coins per second na podstawie hash power
+    const coinsPerSecond = useMemo(() => {
+        if (!farmData || farmData.hashPower === 0) return 0;
+        // Przykładowa formuła: 1 H/s = 0.0001 coins/sec
+        return farmData.hashPower * 0.0001;
+    }, [farmData]);
+
+    // Fetch wallet balance
+    const fetchWalletBalance = useCallback(async () => {
+        if (!wallet) return;
+        try {
+            const address = Address.parse(wallet.account.address);
+            const balance = await client.getBalance(address);
+            setWalletBalance(Number(balance) / 1e9); // Convert from nanoTON to TON
+        } catch (error) {
+            console.error("Błąd pobierania salda:", error);
+        }
+    }, [wallet, client]);
 
     const handleTransaction = async (address, amount, payload) => {
         if (!wallet) return;
@@ -76,8 +154,7 @@ function App() {
             await tonConnectUI.sendTransaction(transaction);
             alert("✅ Transakcja wysłana! Odświeżenie danych może potrwać chwilę.");
             setTimeout(() => {
-                fetchFarmData();
-                fetchInventory();
+                fetchAllData();
             }, 15000);
         } catch (error) {
             console.error("Błąd transakcji:", error);
@@ -89,7 +166,6 @@ function App() {
     
     const fetchFarmData = useCallback(async () => {
         if (!wallet) return;
-        setIsLoading(true);
         try {
             const result = await client.runMethod(
                 Address.parse(STAKING_FARM_ADDRESS), 
@@ -99,10 +175,9 @@ function App() {
             const hashPower = result.stack.readBigNumber();
             const pendingRewards = result.stack.readBigNumber();
             setFarmData({ hashPower: Number(hashPower), pendingRewards: Number(pendingRewards) });
+            setLastUpdateTime(new Date());
         } catch (error) { 
             console.error("Błąd pobierania danych z farmy:", error); 
-        } finally {
-            setIsLoading(false);
         }
     }, [wallet, client]);
 
@@ -119,7 +194,6 @@ function App() {
 
     const fetchInventory = useCallback(async () => {
         if (!wallet) return;
-        setIsLoading(true);
         setInventory([]);
         setInventoryError(null);
         try {
@@ -188,11 +262,21 @@ function App() {
         } catch (error) {
             console.error("Błąd pobierania ekwipunku:", error);
             setInventoryError("❌ Nie udało się pobrać ekwipunku. Spróbuj ponownie za chwilę.");
-        } finally {
-            setIsLoading(false);
         }
     }, [wallet]);
     
+    const fetchAllData = useCallback(async () => {
+        if (!wallet) return;
+        setIsLoading(true);
+        await Promise.all([
+            fetchFarmData(),
+            fetchInventory(),
+            fetchWalletBalance()
+        ]);
+        setIsLoading(false);
+        setAutoRefreshCountdown(30); // Reset countdown
+    }, [wallet, fetchFarmData, fetchInventory, fetchWalletBalance]);
+
     const handleStake = (nftAddress) => {
         // Sprawdź czy to mock NFT
         if (nftAddress.startsWith('collection_nft_')) {
@@ -237,15 +321,45 @@ function App() {
         handleTransaction(NFT_COLLECTION_ADDRESS, toNano('0.1').toString(), body.toBoc().toString("base64"));
     };
     
+    // Auto-refresh effect
+    useEffect(() => {
+        if (!wallet) return;
+        
+        fetchAllData(); // Initial load
+        
+        const interval = setInterval(() => {
+            fetchAllData();
+        }, 30000); // 30 seconds
+        
+        return () => clearInterval(interval);
+    }, [wallet, fetchAllData]);
+
+    // Countdown timer effect
+    useEffect(() => {
+        if (!wallet) return;
+        
+        const countdown = setInterval(() => {
+            setAutoRefreshCountdown(prev => {
+                if (prev <= 1) {
+                    return 30; // Reset to 30
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        
+        return () => clearInterval(countdown);
+    }, [wallet]);
+
+    // Initial data fetch when wallet connects
     useEffect(() => {
         if (wallet) {
-            fetchFarmData();
-            fetchInventory();
+            fetchAllData();
         } else {
             setFarmData(null);
             setInventory([]);
+            setWalletBalance(null);
         }
-    }, [wallet, fetchFarmData, fetchInventory]);
+    }, [wallet, fetchAllData]);
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 text-white flex flex-col items-center justify-center p-4">
@@ -254,6 +368,31 @@ function App() {
                     <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-600 bg-clip-text text-transparent drop-shadow-lg">
                         ⛏️ TON Miner Tycoon 💎
                     </h1>
+                    
+                    {/* Wallet Info Panel */}
+                    {wallet && (
+                        <div className="mt-4 p-3 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-xl border border-blue-500/30">
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="text-blue-300">💰 Saldo:</span>
+                                <span className="text-yellow-400 font-bold">
+                                    {walletBalance !== null ? `${walletBalance.toFixed(4)} TON` : "Ładowanie..."}
+                                </span>
+                            </div>
+                            {coinsPerSecond > 0 && (
+                                <div className="flex justify-between items-center text-sm mt-1">
+                                    <span className="text-green-300">⚡ Zarobek/s:</span>
+                                    <AnimatedNumber value={coinsPerSecond} suffix=" TMT/s" />
+                                </div>
+                            )}
+                            <div className="mt-2 text-center">
+                                <CountdownTimer 
+                                    seconds={autoRefreshCountdown} 
+                                    onComplete={() => fetchAllData()} 
+                                />
+                            </div>
+                        </div>
+                    )}
+                    
                     <div className="mt-4">
                         <TonConnectButton className="hover:scale-105 transition-transform duration-200" />
                     </div>
@@ -304,11 +443,16 @@ function App() {
                                 ) : farmData ? (
                                     <>
                                         <div className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 p-4 rounded-xl border border-blue-500/30">
-                                            <p className="text-lg"><strong className="text-blue-300">⚡ Moc Obliczeniowa:</strong> <span className="text-yellow-400 font-bold">{farmData.hashPower} H/s</span></p>
+                                            <p className="text-lg"><strong className="text-blue-300">⚡ Moc Obliczeniowa:</strong> <AnimatedNumber value={farmData.hashPower} suffix=" H/s" /></p>
                                         </div>
                                         <div className="bg-gradient-to-r from-green-600/20 to-emerald-600/20 p-4 rounded-xl border border-green-500/30">
-                                            <p className="text-lg"><strong className="text-green-300">💰 Oczekujące Nagrody:</strong> <span className="text-yellow-400 font-bold">{(farmData.pendingRewards / 1e9).toFixed(4)} TMT</span></p>
+                                            <p className="text-lg"><strong className="text-green-300">💰 Oczekujące Nagrody:</strong> <AnimatedNumber value={farmData.pendingRewards / 1e9} suffix=" TMT" /></p>
                                         </div>
+                                        {lastUpdateTime && (
+                                            <div className="text-center text-xs text-gray-400">
+                                                📅 Ostatnia aktualizacja: {lastUpdateTime.toLocaleTimeString()}
+                                            </div>
+                                        )}
                                         <button 
                                             onClick={handleClaim} 
                                             disabled={isProcessing || !farmData || farmData.pendingRewards === 0} 
@@ -386,6 +530,7 @@ function App() {
                                         <div className="text-4xl mb-2">🖥️</div>
                                         <h3 className="text-xl font-semibold text-green-300">Basic GPU</h3>
                                         <p className="text-sm text-gray-300 mt-2">⚡ Moc: <span className="text-yellow-400 font-bold">100 H/s</span></p>
+                                        <p className="text-xs text-blue-300 mt-1">💰 Zarobek: ~0.01 TMT/s</p>
                                     </div>
                                     <button 
                                         onClick={handleMint} 
