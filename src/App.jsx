@@ -23,64 +23,34 @@ const EQUIPMENT_TYPES = {
 };
 
 const ACHIEVEMENTS = {
-    firstMiner: { name: "Pierwsze Kroki", emoji: "👶", description: "Kup swój pierwszy sprzęt.", requirement: 1 },
-    powerUser: { name: "Użytkownik Mocy", emoji: "💪", description: "Osiągnij 1000 H/s.", requirement: 1000 },
-    tycoon: { name: "Magnat Miningu", emoji: "👑", description: "Osiągnij 10000 H/s.", requirement: 10000 },
-    collector: { name: "Kolekcjoner", emoji: "🎒", description: "Posiadaj 5 różnych NFT.", requirement: 5 },
-    millionaire: { name: "Milioner", emoji: "💎", description: "Zarób 1000 TMT.", requirement: 1000 },
-    explorer: { name: "Odkrywca", emoji: "🚀", description: "Odblokuj Stację Kosmiczną.", requirement: 1 },
+    firstMiner: { name: "Pierwsze Kroki", emoji: "👶", description: "Kup swój pierwszy sprzęt.", requirement: (data) => data.inventory.length >= 1 },
+    powerUser: { name: "Użytkownik Mocy", emoji: "💪", description: "Osiągnij 1000 H/s.", requirement: (data) => data.farmData.hashPower >= 1000 },
+    tycoon: { name: "Magnat Miningu", emoji: "👑", description: "Osiągnij 10000 H/s.", requirement: (data) => data.farmData.hashPower >= 10000 },
+    collector: { name: "Kolekcjoner", emoji: "🎒", description: "Posiadaj 5 różnych NFT.", requirement: (data) => data.inventory.length >= 5 },
+    millionaire: { name: "Milioner", emoji: "💎", description: "Zarób 1000 TMT.", requirement: (data) => data.playerData.totalEarnings >= 1000 },
+    explorer: { name: "Odkrywca", emoji: "🚀", description: "Odblokuj Stację Kosmiczną.", requirement: (data) => data.playerData.unlockedFarms.space },
 };
+
 
 // --- Komponenty Pomocnicze i UI ---
 
 function AnimatedNumber({ value, suffix = "", prefix = "" }) {
     const [displayValue, setDisplayValue] = useState(value);
-    
     useEffect(() => {
-        const animation = requestAnimationFrame(() => setDisplayValue(value));
-        return () => cancelAnimationFrame(animation);
-    }, [value]);
-    
-    return (
-        <span className="font-bold text-yellow-400 transition-all duration-500">
-            {prefix}{displayValue.toFixed(4)}{suffix}
-        </span>
-    );
+        if (value !== displayValue) {
+            const animation = requestAnimationFrame(() => setDisplayValue(value));
+            return () => cancelAnimationFrame(animation);
+        }
+    }, [value, displayValue]);
+    return <span className="font-bold text-yellow-400 transition-all duration-500">{prefix}{displayValue.toFixed(4)}{suffix}</span>;
 }
 
 function FarmCard({ farmKey, farm, isSelected, isUnlocked, onSelect }) {
      return (
         <div 
             onClick={() => isUnlocked && onSelect(farmKey)}
-            className={`p-4 rounded-xl border-2 transition-all duration-300 cursor-pointer ${
-                !isUnlocked 
-                    ? 'opacity-50 cursor-not-allowed border-gray-500/30 bg-gray-600/20'
-                    : isSelected
-                        ? `${farm.border} bg-gradient-to-br ${farm.background} shadow-lg transform scale-105`
-                        : `${farm.border} bg-gradient-to-br ${farm.background} hover:scale-102 hover:shadow-md`
-            }`}
-        >
-            <div className="text-center">
-                <div className="text-4xl mb-2">{farm.emoji}</div>
-                <h3 className="font-bold text-white text-lg">{farm.name}</h3>
-                <p className="text-xs text-gray-300 mt-1">{farm.description}</p>
-                 <div className="mt-3 space-y-1 text-xs">
-                    <div className="flex justify-between">
-                        <span className="text-green-300">⚡ Efektywność:</span>
-                        <span className="text-green-400 font-bold">x{farm.efficiency}</span>
-                    </div>
-                </div>
-                {!isUnlocked && (
-                    <div className="mt-3 py-1 px-3 bg-gray-600/50 rounded-lg">
-                        <span className="text-gray-300 text-xs">🔒 Poziom {farm.unlockLevel}</span>
-                    </div>
-                )}
-                {isSelected && isUnlocked && (
-                    <div className="mt-3 py-1 px-3 bg-amber-500/30 rounded-lg border border-amber-400/50">
-                        <span className="text-amber-300 text-xs font-bold">✅ Aktywna</span>
-                    </div>
-                )}
-            </div>
+            className={`p-3 rounded-xl border-2 transition-all duration-300 cursor-pointer ${!isUnlocked ? 'opacity-50 cursor-not-allowed border-gray-500/30 bg-gray-600/20' : isSelected ? `${farm.border} bg-gradient-to-br ${farm.background} shadow-lg transform scale-105` : `${farm.border} bg-gradient-to-br ${farm.background} hover:scale-102 hover:shadow-md`}`}>
+            <div className="text-center"><div className="text-3xl mb-1">{farm.emoji}</div><h3 className="font-bold text-white text-md">{farm.name}</h3><div className="mt-2 space-y-1 text-xs"><div className="flex justify-between"><span className="text-green-300">⚡ Efekt:</span><span className="text-green-400 font-bold">x{farm.efficiency}</span></div></div>{!isUnlocked && (<div className="mt-2 py-1 px-2 bg-gray-600/50 rounded-lg"><span className="text-gray-300 text-xs">🔒 Poziom {farm.unlockLevel}</span></div>)}{isSelected && isUnlocked && (<div className="mt-2 py-1 px-2 bg-amber-500/30 rounded-lg border border-amber-400/50"><span className="text-amber-300 text-xs font-bold">✅ Aktywna</span></div>)}</div>
         </div>
     );
 }
@@ -88,20 +58,12 @@ function FarmCard({ farmKey, farm, isSelected, isUnlocked, onSelect }) {
 function NftItem({ item, onStake, isProcessing }) {
     return (
         <div className="border border-gray-600 p-4 rounded-lg flex justify-between items-center">
-            <div>
-                <h3 className="text-xl font-semibold">{item.name}</h3>
-                <p className="text-sm text-gray-400 mt-1">{item.description}</p>
-            </div>
-            <button
-                onClick={() => onStake(item.address)}
-                disabled={isProcessing}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition"
-            >
-                {isProcessing ? "Przetwarzanie..." : "Podłącz"}
-            </button>
+            <div><h3 className="text-xl font-semibold">{item.name}</h3><p className="text-sm text-gray-400 mt-1">{item.description}</p></div>
+            <button onClick={() => onStake(item.address)} disabled={isProcessing} className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition">{isProcessing ? "Przetwarzanie..." : "Podłącz"}</button>
         </div>
     );
 }
+
 
 // --- Główny Komponent Aplikacji ---
 
@@ -110,24 +72,20 @@ function App() {
     const [tonConnectUI] = useTonConnectUI();
     const [view, setView] = useState('farm');
     
-    // Dane z blockchaina
     const [farmData, setFarmData] = useState({ hashPower: 0, pendingRewards: 0 });
     const [inventory, setInventory] = useState([]);
     const [inventoryError, setInventoryError] = useState(null);
     
-    // Stany UI
     const [isLoading, setIsLoading] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
 
-    // Stan gry zapisywany w Telegram Cloud Storage
     const [playerData, setPlayerData] = useState({
         selectedFarm: 'earth',
-        achievements: {}
+        achievements: {},
+        totalEarnings: 0,
     });
 
-    const client = useMemo(() => new TonClient({
-        endpoint: 'https://testnet.toncenter.com/api/v2/jsonRPC'
-    }), []);
+    const client = useMemo(() => new TonClient({ endpoint: 'https://testnet.toncenter.com/api/v2/jsonRPC' }), []);
     
     // --- LOGIKA ZAPISU I WCZYTYWANIA DANYCH ---
     const loadGameState = useCallback(() => {
@@ -149,14 +107,11 @@ function App() {
         if (window.Telegram?.WebApp?.CloudStorage) {
             window.Telegram.WebApp.CloudStorage.setItem('playerData', JSON.stringify(dataToSave), (err, success) => {
                 if (err) { console.error("Błąd zapisu danych do Cloud Storage:", err); }
-                if (success) { console.log("💾 Dane gracza zapisane w Telegram Cloud Storage."); }
             });
         }
     }, []);
 
-    useEffect(() => {
-        saveGameState(playerData);
-    }, [playerData, saveGameState]);
+    useEffect(() => { saveGameState(playerData); }, [playerData, saveGameState]);
 
 
     // --- GŁÓWNA LOGIKA APLIKACJI ---
@@ -165,15 +120,12 @@ function App() {
         if (!wallet) return;
         setIsProcessing(true);
         try {
-            const transaction = {
+            await tonConnectUI.sendTransaction({
                 validUntil: Math.floor(Date.now() / 1000) + 60,
                 messages: [{ address, amount, payload }]
-            };
-            await tonConnectUI.sendTransaction(transaction);
-            alert("✅ Transakcja wysłana! Odświeżenie danych może potrwać chwilę.");
-            setTimeout(() => {
-                fetchAllData();
-            }, 15000);
+            });
+            alert("✅ Transakcja wysłana! Odświeżenie danych za 15 sekund.");
+            setTimeout(fetchAllData, 15000);
         } catch (error) {
             console.error("Błąd transakcji:", error);
             alert("❌ Transakcja nie powiodła się.");
@@ -190,24 +142,28 @@ function App() {
                 "get_player_info", 
                 [{ type: 'slice', cell: beginCell().storeAddress(Address.parse(wallet.account.address)).endCell() }]
             );
-            const hashPower = result.stack.readBigNumber();
-            const pendingRewards = result.stack.readBigNumber();
-            setFarmData({ hashPower: Number(hashPower), pendingRewards: Number(pendingRewards) });
+            const hashPower = Number(result.stack.readBigNumber());
+            const pendingRewards = Number(result.stack.readBigNumber());
+            setFarmData({ hashPower, pendingRewards });
         } catch (error) { 
             console.error("Błąd pobierania danych z farmy:", error); 
-            setFarmData({ hashPower: 0, pendingRewards: 0 }); // Resetuj do wartości domyślnych w przypadku błędu
+            setFarmData({ hashPower: 0, pendingRewards: 0 });
         }
     }, [wallet, client]);
 
     const handleClaim = () => {
-        const claimOpCode = 1906195048;
+        const claimOpCode = 1906195048; // Pamiętaj, aby podmienić na prawdziwy
         const body = beginCell().storeUint(claimOpCode, 32).storeUint(BigInt(Date.now()), 64).endCell();
         handleTransaction(STAKING_FARM_ADDRESS, toNano('0.05').toString(), body.toBoc().toString("base64"));
+        
+        // Aktualizacja zarobków gracza
+        if(farmData) {
+            setPlayerData(prev => ({...prev, totalEarnings: prev.totalEarnings + (farmData.pendingRewards / 1e9)}));
+        }
     };
 
     const fetchInventory = useCallback(async () => {
         if (!wallet) return;
-        setInventory([]);
         setInventoryError(null);
         try {
             const playerAddress = Address.parse(wallet.account.address);
@@ -223,6 +179,8 @@ function App() {
                     description: item.metadata?.description || "Brak opisu"
                 }));
                 setInventory(items);
+            } else {
+                setInventory([]);
             }
         } catch (error) {
             console.error("Błąd pobierania ekwipunku:", error);
@@ -254,7 +212,7 @@ function App() {
             }))
             .endCell();
         
-        const mintOpCode = 3871065451; 
+        const mintOpCode = 3871065451; // Pamiętaj, aby podmienić na prawdziwy
         
         const body = beginCell()
             .storeUint(mintOpCode, 32)
@@ -262,15 +220,14 @@ function App() {
             .storeAddress(Address.parse(wallet.account.address))
             .storeRef(metadataCell)
             .endCell();
-        handleTransaction(NFT_COLLECTION_ADDRESS, toNano(equipment.price + 0.1).toString(), body.toBoc().toString("base64"));
+        handleTransaction(NFT_COLLECTION_ADDRESS, toNano(equipment.price + 0.05).toString(), body.toBoc().toString("base64"));
     };
     
     const fetchAllData = useCallback(async () => {
-        if (!wallet) return;
         setIsLoading(true);
         await Promise.all([fetchFarmData(), fetchInventory()]);
         setIsLoading(false);
-    }, [wallet, fetchFarmData, fetchInventory]);
+    }, [fetchFarmData, fetchInventory]);
 
     useEffect(() => {
         if (window.Telegram?.WebApp) {
@@ -302,6 +259,31 @@ function App() {
         });
         return unlocked;
     }, [playerLevel]);
+
+    const checkAchievements = useCallback(() => {
+        const newAchievements = { ...playerData.achievements };
+        let changed = false;
+        const currentData = { farmData, inventory, playerData, unlockedFarms };
+
+        Object.entries(ACHIEVEMENTS).forEach(([key, ach]) => {
+            if (!newAchievements[key] && ach.requirement(currentData)) {
+                newAchievements[key] = true;
+                changed = true;
+                alert(`🏆 Osiągnięcie odblokowane: ${ach.name}!`);
+            }
+        });
+
+        if (changed) {
+            setPlayerData(prev => ({ ...prev, achievements: newAchievements }));
+        }
+    }, [farmData, inventory, playerData, unlockedFarms]);
+
+    useEffect(() => {
+        if(farmData && inventory) {
+            checkAchievements();
+        }
+    }, [farmData, inventory, checkAchievements]);
+
 
     return (
         <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4">
@@ -384,7 +366,7 @@ function App() {
                         <div className="bg-gray-700 p-4 rounded-lg text-left space-y-3">
                             <h2 className="text-2xl font-bold mb-4">Osiągnięcia</h2>
                             {Object.entries(ACHIEVEMENTS).map(([key, ach]) => (
-                                <div key={key} className={`p-3 rounded-lg ${playerData.achievements[key] ? 'bg-green-500/20' : 'bg-gray-600/20'}`}>
+                                <div key={key} className={`p-3 rounded-lg ${playerData.achievements[key] ? 'bg-green-500/20 border border-green-500/50' : 'bg-gray-600/20'}`}>
                                     <p className="font-bold">{ach.emoji} {ach.name}</p>
                                     <p className="text-xs text-gray-400">{ach.description}</p>
                                 </div>
