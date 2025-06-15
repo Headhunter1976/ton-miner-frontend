@@ -7,6 +7,46 @@ import { toNano, beginCell } from '@ton/core';
 const STAKING_FARM_ADDRESS = "EQC8MN1ykQZtHHHrWHGSOFyMB7tihHyL3paweoV8DFcJ7V3g";
 const NFT_COLLECTION_ADDRESS = "EQA1W7wNN-dwYQIcfUZXk8BEZsNGlGiWB3sskFrYLPZis36m";
 
+// Konfiguracja typów sprzętu
+const EQUIPMENT_TYPES = {
+    basic: {
+        name: "Basic GPU",
+        emoji: "🖥️",
+        hashPower: 100,
+        price: 0, // Za darmo
+        level: 1,
+        description: "Podstawowy sprzęt do kopania",
+        coinsPerSecond: 0.01
+    },
+    advanced: {
+        name: "Advanced ASIC",
+        emoji: "⚡",
+        hashPower: 500,
+        price: 0.5,
+        level: 2,
+        description: "Profesjonalny miner ASIC",
+        coinsPerSecond: 0.05
+    },
+    quantum: {
+        name: "Quantum Miner",
+        emoji: "🚀",
+        hashPower: 2000,
+        price: 2.0,
+        level: 3,
+        description: "Futurystyczny quantum processor",
+        coinsPerSecond: 0.2
+    },
+    fusion: {
+        name: "Fusion Core",
+        emoji: "🌟",
+        hashPower: 10000,
+        price: 10.0,
+        level: 4,
+        description: "Najlepszy sprzęt w galaktyce",
+        coinsPerSecond: 1.0
+    }
+};
+
 // Komponenty pomocnicze
 function AnimatedNumber({ value, suffix = "", prefix = "" }) {
     const [displayValue, setDisplayValue] = useState(value);
@@ -63,16 +103,77 @@ function CountdownTimer({ seconds, onComplete }) {
     );
 }
 
+function EquipmentCard({ type, equipment, onBuy, isProcessing, canAfford, isUnlocked, playerLevel }) {
+    const isAvailable = isUnlocked && canAfford;
+    const needsLevel = equipment.level > playerLevel;
+    
+    return (
+        <div className={`border p-6 rounded-2xl transition-all duration-300 ${
+            isAvailable 
+                ? 'border-green-500/50 bg-gradient-to-r from-green-600/20 to-emerald-600/20 hover:border-green-400/70 hover:shadow-lg hover:shadow-green-500/20 hover:scale-105' 
+                : needsLevel
+                    ? 'border-purple-500/30 bg-gradient-to-r from-purple-600/10 to-violet-600/10'
+                    : 'border-red-500/30 bg-gradient-to-r from-red-600/10 to-pink-600/10'
+        }`}>
+            <div className="text-center mb-4">
+                <div className="text-4xl mb-2">{equipment.emoji}</div>
+                <h3 className="text-xl font-semibold text-white">{equipment.name}</h3>
+                <p className="text-sm text-gray-300 mt-1">{equipment.description}</p>
+                
+                <div className="mt-3 space-y-1">
+                    <p className="text-sm">⚡ <span className="text-yellow-400 font-bold">{equipment.hashPower} H/s</span></p>
+                    <p className="text-sm">💰 <span className="text-green-400 font-bold">{equipment.coinsPerSecond} TMT/s</span></p>
+                    <p className="text-sm">🎯 <span className="text-blue-400 font-bold">Poziom {equipment.level}</span></p>
+                </div>
+                
+                <div className="mt-3">
+                    {equipment.price === 0 ? (
+                        <span className="text-green-400 font-bold text-lg">🎁 DARMOWY</span>
+                    ) : (
+                        <span className="text-yellow-400 font-bold text-lg">💎 {equipment.price} TON</span>
+                    )}
+                </div>
+            </div>
+            
+            <button 
+                onClick={() => onBuy(type)} 
+                disabled={isProcessing || !isAvailable || needsLevel} 
+                className={`w-full py-3 px-6 rounded-xl font-bold transition-all duration-300 ${
+                    isProcessing 
+                        ? 'bg-gray-500 text-gray-300 cursor-not-allowed' 
+                        : needsLevel
+                            ? 'bg-purple-600/50 text-purple-300 cursor-not-allowed'
+                            : isAvailable
+                                ? 'bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-500 hover:to-emerald-600 text-white shadow-lg shadow-green-500/30 hover:shadow-green-500/50 active:scale-95'
+                                : 'bg-red-600/50 text-red-300 cursor-not-allowed'
+                }`}
+            >
+                {isProcessing ? "⏳ Tworzenie..." : 
+                 needsLevel ? `🔒 Wymaga poziom ${equipment.level}` :
+                 !canAfford ? "💸 Za drogo" :
+                 equipment.price === 0 ? "🎁 Zdobądź za darmo" : "💰 Kup teraz"}
+            </button>
+        </div>
+    );
+}
+
 // Komponent dla pojedynczego przedmiotu w ekwipunku
 function NftItem({ item, onStake, isProcessing }) {
+    // Sprawdź jaki to typ sprzętu na podstawie nazwy
+    const equipmentType = Object.values(EQUIPMENT_TYPES).find(eq => 
+        item.name.toLowerCase().includes(eq.name.toLowerCase()) || 
+        item.name === eq.name
+    ) || EQUIPMENT_TYPES.basic;
+
     return (
         <div className="border border-blue-500/30 bg-gradient-to-r from-gray-700/50 to-gray-600/50 p-4 rounded-xl backdrop-blur-sm hover:border-blue-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/20 hover:scale-105">
             <div className="flex justify-between items-center">
                 <div>
                     <h3 className="text-xl font-semibold text-white flex items-center gap-2">
-                        ⛏️ {item.name}
+                        {equipmentType.emoji} {item.name}
                     </h3>
-                    <p className="text-sm text-blue-300 mt-1">✨ Gotowy do podłączenia</p>
+                    <p className="text-sm text-blue-300 mt-1">⚡ {equipmentType.hashPower} H/s</p>
+                    <p className="text-xs text-green-300">💰 {equipmentType.coinsPerSecond} TMT/s</p>
                 </div>
                 <button
                     onClick={() => onStake(item.address)}
@@ -124,11 +225,20 @@ function App() {
         endpoint: 'https://testnet.toncenter.com/api/v2/jsonRPC'
     }), []);
 
-    // Oblicz coins per second na podstawie hash power
-    const coinsPerSecond = useMemo(() => {
-        if (!farmData || farmData.hashPower === 0) return 0;
-        // Przykładowa formuła: 1 H/s = 0.0001 coins/sec
-        return farmData.hashPower * 0.0001;
+    // Oblicz całkowity coins per second i poziom gracza
+    const playerStats = useMemo(() => {
+        if (!farmData) return { coinsPerSecond: 0, level: 1, totalHashPower: 0 };
+        
+        const totalHashPower = farmData.hashPower;
+        const coinsPerSecond = totalHashPower * 0.0001;
+        
+        // Poziom na podstawie hash power
+        let level = 1;
+        if (totalHashPower >= 10000) level = 4;
+        else if (totalHashPower >= 2000) level = 3;
+        else if (totalHashPower >= 500) level = 2;
+        
+        return { coinsPerSecond, level, totalHashPower };
     }, [farmData]);
 
     // Fetch wallet balance
@@ -245,7 +355,7 @@ function App() {
                     for (let i = 0; i < nextItemIndex; i++) {
                         mockNFTs.push({
                             address: `collection_nft_${i}`,
-                            name: "Mining Rig Basic",
+                            name: "Basic GPU",
                             description: "Sprzęt górniczy (symulowany - staking niedostępny)"
                         });
                     }
@@ -296,13 +406,15 @@ function App() {
         handleTransaction(nftAddress, toNano('0.1').toString(), body.toBoc().toString("base64"));
     };
 
-    const handleMint = () => {
-        // DOKŁADNIE taka sama metadatabase jak w skrypcie (skomplikowana z ref)
+    const handleBuyEquipment = (equipmentType) => {
+        const equipment = EQUIPMENT_TYPES[equipmentType];
+        
+        // Stwórz metadata z odpowiednim typem
         const metadataCell = beginCell()
-            .storeStringTail("Mining Rig Basic")
+            .storeStringTail(equipment.name)
             .storeRef(
                 beginCell()
-                    .storeStringTail("https://example.com/nft/1.json")
+                    .storeStringTail(`https://example.com/nft/${equipmentType}.json`)
                     .endCell()
             )
             .endCell();
@@ -317,8 +429,9 @@ function App() {
             .storeRef(metadataCell)
             .endCell();
         
-        // DOKŁADNIE taki sam gas jak skrypt: 0.1 TON
-        handleTransaction(NFT_COLLECTION_ADDRESS, toNano('0.1').toString(), body.toBoc().toString("base64"));
+        // Różne koszty w zależności od typu
+        const cost = equipment.price === 0 ? '0.1' : equipment.price.toString();
+        handleTransaction(NFT_COLLECTION_ADDRESS, toNano(cost).toString(), body.toBoc().toString("base64"));
     };
     
     // Auto-refresh effect
@@ -372,18 +485,30 @@ function App() {
                     {/* Wallet Info Panel */}
                     {wallet && (
                         <div className="mt-4 p-3 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-xl border border-blue-500/30">
-                            <div className="flex justify-between items-center text-sm">
-                                <span className="text-blue-300">💰 Saldo:</span>
-                                <span className="text-yellow-400 font-bold">
-                                    {walletBalance !== null ? `${walletBalance.toFixed(4)} TON` : "Ładowanie..."}
-                                </span>
-                            </div>
-                            {coinsPerSecond > 0 && (
-                                <div className="flex justify-between items-center text-sm mt-1">
-                                    <span className="text-green-300">⚡ Zarobek/s:</span>
-                                    <AnimatedNumber value={coinsPerSecond} suffix=" TMT/s" />
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                                <div className="flex justify-between">
+                                    <span className="text-blue-300">💰 Saldo:</span>
+                                    <span className="text-yellow-400 font-bold">
+                                        {walletBalance !== null ? `${walletBalance.toFixed(4)} TON` : "Ładowanie..."}
+                                    </span>
                                 </div>
-                            )}
+                                <div className="flex justify-between">
+                                    <span className="text-purple-300">🎯 Poziom:</span>
+                                    <span className="text-pink-400 font-bold">{playerStats.level}</span>
+                                </div>
+                                {playerStats.coinsPerSecond > 0 && (
+                                    <>
+                                        <div className="flex justify-between">
+                                            <span className="text-green-300">⚡ Zarobek/s:</span>
+                                            <AnimatedNumber value={playerStats.coinsPerSecond} suffix=" TMT/s" />
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-blue-300">🔥 Hash Power:</span>
+                                            <span className="text-cyan-400 font-bold">{playerStats.totalHashPower} H/s</span>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
                             <div className="mt-2 text-center">
                                 <CountdownTimer 
                                     seconds={autoRefreshCountdown} 
@@ -521,28 +646,28 @@ function App() {
 
                     {view === 'shop' && (
                         wallet ? (
-                            <div className="bg-gradient-to-br from-gray-700/50 to-gray-600/30 backdrop-blur-sm p-6 rounded-2xl text-left space-y-4 border border-gray-600/30">
+                            <div className="bg-gradient-to-br from-gray-700/50 to-gray-600/30 backdrop-blur-sm p-6 rounded-2xl space-y-4 border border-gray-600/30 max-h-96 overflow-y-auto">
                                 <h2 className="text-2xl font-bold mb-4 text-center bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
                                     🏪 Sklep ze Sprzętem
                                 </h2>
-                                <div className="border border-green-500/30 bg-gradient-to-r from-green-600/20 to-emerald-600/20 p-6 rounded-2xl hover:border-green-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-green-500/20">
-                                    <div className="text-center mb-4">
-                                        <div className="text-4xl mb-2">🖥️</div>
-                                        <h3 className="text-xl font-semibold text-green-300">Basic GPU</h3>
-                                        <p className="text-sm text-gray-300 mt-2">⚡ Moc: <span className="text-yellow-400 font-bold">100 H/s</span></p>
-                                        <p className="text-xs text-blue-300 mt-1">💰 Zarobek: ~0.01 TMT/s</p>
-                                    </div>
-                                    <button 
-                                        onClick={handleMint} 
-                                        disabled={isProcessing} 
-                                        className={`w-full py-4 px-6 rounded-xl font-bold text-lg transition-all duration-300 ${
-                                            isProcessing 
-                                                ? 'bg-gray-500 text-gray-300 cursor-not-allowed' 
-                                                : 'bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-500 hover:to-emerald-600 text-white shadow-lg shadow-green-500/30 hover:shadow-green-500/50 hover:scale-105 active:scale-95'
-                                        }`}
-                                    >
-                                        {isProcessing ? "⏳ Tworzenie..." : "🎁 Zdobądź (za darmo)"}
-                                    </button>
+                                
+                                <div className="grid gap-4">
+                                    {Object.entries(EQUIPMENT_TYPES).map(([type, equipment]) => (
+                                        <EquipmentCard
+                                            key={type}
+                                            type={type}
+                                            equipment={equipment}
+                                            onBuy={handleBuyEquipment}
+                                            isProcessing={isProcessing}
+                                            canAfford={walletBalance !== null && walletBalance >= equipment.price}
+                                            isUnlocked={playerStats.level >= equipment.level}
+                                            playerLevel={playerStats.level}
+                                        />
+                                    ))}
+                                </div>
+                                
+                                <div className="text-center mt-4 p-3 bg-blue-600/10 rounded-lg border border-blue-500/30">
+                                    <p className="text-sm text-blue-300">💡 Zwiększ hash power, aby odblokować lepszy sprzęt!</p>
                                 </div>
                             </div>
                         ) : (
