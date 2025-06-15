@@ -37,30 +37,13 @@ function AnimatedNumber({ value, suffix = "", prefix = "" }) {
     const [displayValue, setDisplayValue] = useState(value);
     
     useEffect(() => {
-        if (value !== displayValue) {
-            const duration = 500;
-            const steps = 20;
-            const stepValue = (value - displayValue) / steps;
-            const stepTime = duration / steps;
-            
-            let currentStep = 0;
-            const timer = setInterval(() => {
-                currentStep++;
-                if (currentStep >= steps) {
-                    setDisplayValue(value);
-                    clearInterval(timer);
-                } else {
-                    setDisplayValue(prev => prev + stepValue);
-                }
-            }, stepTime);
-            
-            return () => clearInterval(timer);
-        }
-    }, [value, displayValue]);
+        const animation = requestAnimationFrame(() => setDisplayValue(value));
+        return () => cancelAnimationFrame(animation);
+    }, [value]);
     
     return (
-        <span className="font-bold text-yellow-400 transition-all duration-300">
-            {prefix}{value.toFixed(4)}{suffix}
+        <span className="font-bold text-yellow-400 transition-all duration-500">
+            {prefix}{displayValue.toFixed(4)}{suffix}
         </span>
     );
 }
@@ -128,7 +111,7 @@ function App() {
     const [view, setView] = useState('farm');
     
     // Dane z blockchaina
-    const [farmData, setFarmData] = useState(null);
+    const [farmData, setFarmData] = useState({ hashPower: 0, pendingRewards: 0 });
     const [inventory, setInventory] = useState([]);
     const [inventoryError, setInventoryError] = useState(null);
     
@@ -178,14 +161,6 @@ function App() {
 
     // --- GŁÓWNA LOGIKA APLIKACJI ---
 
-    const fetchAllData = useCallback(async () => {
-        if (!wallet) return;
-        setIsLoading(true);
-        console.log("Fetching all data...");
-        await Promise.all([fetchFarmData(), fetchInventory()]);
-        setIsLoading(false);
-    }, [wallet]);
-
     const handleTransaction = async (address, amount, payload) => {
         if (!wallet) return;
         setIsProcessing(true);
@@ -196,7 +171,9 @@ function App() {
             };
             await tonConnectUI.sendTransaction(transaction);
             alert("✅ Transakcja wysłana! Odświeżenie danych może potrwać chwilę.");
-            setTimeout(fetchAllData, 15000);
+            setTimeout(() => {
+                fetchAllData();
+            }, 15000);
         } catch (error) {
             console.error("Błąd transakcji:", error);
             alert("❌ Transakcja nie powiodła się.");
@@ -218,12 +195,12 @@ function App() {
             setFarmData({ hashPower: Number(hashPower), pendingRewards: Number(pendingRewards) });
         } catch (error) { 
             console.error("Błąd pobierania danych z farmy:", error); 
-            setFarmData(null);
+            setFarmData({ hashPower: 0, pendingRewards: 0 }); // Resetuj do wartości domyślnych w przypadku błędu
         }
     }, [wallet, client]);
 
     const handleClaim = () => {
-        const claimOpCode = 1906195048; // Pamiętaj, aby podmienić na prawdziwy
+        const claimOpCode = 1906195048;
         const body = beginCell().storeUint(claimOpCode, 32).storeUint(BigInt(Date.now()), 64).endCell();
         handleTransaction(STAKING_FARM_ADDRESS, toNano('0.05').toString(), body.toBoc().toString("base64"));
     };
@@ -277,7 +254,7 @@ function App() {
             }))
             .endCell();
         
-        const mintOpCode = 3871065451; // Pamiętaj, aby podmienić na prawdziwy
+        const mintOpCode = 3871065451; 
         
         const body = beginCell()
             .storeUint(mintOpCode, 32)
@@ -288,6 +265,13 @@ function App() {
         handleTransaction(NFT_COLLECTION_ADDRESS, toNano(equipment.price + 0.1).toString(), body.toBoc().toString("base64"));
     };
     
+    const fetchAllData = useCallback(async () => {
+        if (!wallet) return;
+        setIsLoading(true);
+        await Promise.all([fetchFarmData(), fetchInventory()]);
+        setIsLoading(false);
+    }, [wallet, fetchFarmData, fetchInventory]);
+
     useEffect(() => {
         if (window.Telegram?.WebApp) {
             window.Telegram.WebApp.ready();
@@ -299,9 +283,6 @@ function App() {
     useEffect(() => {
         if (wallet) {
             fetchAllData();
-        } else {
-            setFarmData(null);
-            setInventory([]);
         }
     }, [wallet, fetchAllData]);
 
