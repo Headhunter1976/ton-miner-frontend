@@ -27,6 +27,25 @@ function NftItem({ item, onStake, isProcessing }) {
 }
 
 function App() {
+    // 🚀 TELEGRAM WEBAPP INTEGRATION
+    useEffect(() => {
+        // Sprawdź czy aplikacja działa w Telegram
+        if (window.Telegram?.WebApp) {
+            window.Telegram.WebApp.ready();
+            window.Telegram.WebApp.expand();
+            
+            // Opcjonalnie: pobierz dane użytkownika Telegram
+            const user = window.Telegram.WebApp.initDataUnsafe?.user;
+            if (user) {
+                console.log('🎮 Telegram user:', user.first_name);
+            }
+            
+            console.log('✅ Telegram WebApp activated!');
+        } else {
+            console.log('🌐 Running in browser mode');
+        }
+    }, []);
+
     const wallet = useTonWallet();
     const [tonConnectUI] = useTonConnectUI();
     
